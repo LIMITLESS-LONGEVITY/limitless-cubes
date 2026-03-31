@@ -79,6 +79,7 @@ interface BuilderState {
   // Actions — editing existing content
   loadSession: (entity: EditingEntity, items: BuilderExercise[], phases: Phase[]) => void
   loadProgram: (entity: EditingEntity, items: BuilderSession[]) => void
+  loadFromTemplate: (items: BuilderExercise[], phases: Phase[]) => void
 
   // Actions — lifecycle
   clear: () => void
@@ -222,6 +223,23 @@ export const useBuilderStore = create<BuilderState>()(
           phases: [],
           editingEntity: entity,
           isDirty: false,
+          selectedSlotId: null,
+        })
+      },
+
+      /** Load a template as a new session (deep copy, no editingEntity) */
+      loadFromTemplate: (items: BuilderExercise[], phases: Phase[]) => {
+        // Generate fresh slot IDs so the template items are independent
+        const freshItems = items.map((item) => ({
+          ...item,
+          slotId: generateSlotId(),
+        }))
+        set({
+          items: freshItems,
+          mode: 'session',
+          phases,
+          editingEntity: null,
+          isDirty: true,
           selectedSlotId: null,
         })
       },
