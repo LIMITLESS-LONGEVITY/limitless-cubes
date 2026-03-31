@@ -7,13 +7,18 @@ import { syncUser } from './user-sync'
  * Returns NextResponse error if not authenticated.
  */
 export async function getAuthenticatedUser() {
-  const payload = await getAuthPayload()
-  if (!payload) {
-    return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) }
-  }
+  try {
+    const payload = await getAuthPayload()
+    if (!payload) {
+      return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) }
+    }
 
-  const user = await syncUser(payload)
-  return { user }
+    const user = await syncUser(payload)
+    return { user }
+  } catch (err) {
+    console.error('Auth error:', err)
+    return { error: NextResponse.json({ error: 'Internal auth error', detail: err instanceof Error ? err.message : String(err) }, { status: 500 }) }
+  }
 }
 
 /**
