@@ -29,8 +29,7 @@ export async function getAuthPayload(): Promise<JWTPayload | null> {
       headers: {
         Authorization: `JWT ${token}`,
       },
-      // Cache for 60 seconds to reduce calls to PATHS
-      next: { revalidate: 60 },
+      cache: 'no-store',
     })
 
     if (!res.ok) return null
