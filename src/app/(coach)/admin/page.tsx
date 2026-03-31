@@ -10,6 +10,7 @@ import {
   Dumbbell,
   CalendarDays,
   LayoutGrid,
+  CreditCard,
   Crown,
   Shield,
   ArrowRight,
@@ -131,6 +132,12 @@ export default function AdminPage() {
       label: 'Invitations',
       description: 'Invite new members and track pending invitations',
       icon: Mail,
+    },
+    {
+      href: '/admin/billing',
+      label: 'Billing',
+      description: 'Subscription plan, usage limits, and upgrades',
+      icon: CreditCard,
     },
     {
       href: '/admin/settings',

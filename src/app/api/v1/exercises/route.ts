@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getAuthenticatedUser, errorResponse, successResponse } from '@/lib/api-utils'
 import { createExerciseSchema, listQuerySchema } from '@/lib/validation'
+import { checkContentLimit, formatLimitError } from '@/lib/plan-limits'
 import { Prisma } from '@prisma/client'
 
 /**
@@ -99,6 +100,12 @@ export async function POST(request: NextRequest) {
 
   // Get user's active org (use first active membership for now)
   const membership = auth.user.memberships[0]
+
+  // Check plan limits
+  const limitCheck = await checkContentLimit(auth.user.id, membership?.organizationId ?? null, 'exercise')
+  if (!limitCheck.allowed) {
+    return errorResponse(formatLimitError(limitCheck, 'exercise'), 403)
+  }
 
   const exercise = await prisma.exercise.create({
     data: {

@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getAuthenticatedUser, errorResponse, successResponse } from '@/lib/api-utils'
 import { createProgramSchema, listQuerySchema } from '@/lib/validation'
+import { checkContentLimit, formatLimitError } from '@/lib/plan-limits'
 import { Prisma } from '@prisma/client'
 
 const programInclude = {
@@ -91,6 +92,12 @@ export async function POST(request: NextRequest) {
 
   const { domainIds, sessions, ...data } = parsed.data
   const membership = auth.user.memberships[0]
+
+  // Check plan limits
+  const limitCheck = await checkContentLimit(auth.user.id, membership?.organizationId ?? null, 'program')
+  if (!limitCheck.allowed) {
+    return errorResponse(formatLimitError(limitCheck, 'program'), 403)
+  }
 
   // Calculate duration from sessions if provided
   let durationSeconds = 0
