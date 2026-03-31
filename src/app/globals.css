@@ -30,3 +30,26 @@ body {
 .input-field::placeholder {
   color: #666;
 }
+
+/* Dropdown items */
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  color: #a3a3a3;
+  transition: background-color 0.15s, color 0.15s;
+  text-align: left;
+}
+
+.dropdown-item:hover {
+  background: #262626;
+  color: #e5e5e5;
+}
+
+/* Safari backdrop-filter */
+.-webkit-backdrop-filter-blur-md {
+  -webkit-backdrop-filter: blur(12px);
+}
