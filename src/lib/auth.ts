@@ -1,4 +1,3 @@
-import { jwtVerify } from 'jose'
 import { cookies } from 'next/headers'
 
 export interface JWTPayload {
@@ -6,14 +5,19 @@ export interface JWTPayload {
   email: string
   collection: string
   sid?: string
-  iat: number
-  exp: number
 }
 
+const PATHS_API_URL = process.env.PATHS_API_URL || 'https://app.limitless-longevity.health/learn'
+
 /**
- * Validate the shared payload-token cookie from LIMITLESS SSO.
- * Uses jose library (same as Payload CMS) for JWT verification.
- * Returns the decoded JWT payload or null if invalid/missing.
+ * Validate the shared payload-token cookie by calling PATHS /api/users/me.
+ *
+ * We delegate JWT verification to PATHS (the auth authority) rather than
+ * verifying locally, because Payload CMS's internal JWT signing may differ
+ * from standard jose/jsonwebtoken verification.
+ *
+ * The result is cached per-request via Next.js deduplication (same fetch
+ * URL within a single request lifecycle is automatically deduped).
  */
 export async function getAuthPayload(): Promise<JWTPayload | null> {
   const cookieStore = await cookies()
@@ -21,12 +25,25 @@ export async function getAuthPayload(): Promise<JWTPayload | null> {
   if (!token) return null
 
   try {
-    const secret = process.env.PAYLOAD_SECRET
-    if (!secret) throw new Error('PAYLOAD_SECRET not configured')
+    const res = await fetch(`${PATHS_API_URL}/api/users/me`, {
+      headers: {
+        Authorization: `JWT ${token}`,
+      },
+      // Cache for 60 seconds to reduce calls to PATHS
+      next: { revalidate: 60 },
+    })
 
-    const secretKey = new TextEncoder().encode(secret)
-    const { payload } = await jwtVerify(token, secretKey)
-    return payload as unknown as JWTPayload
+    if (!res.ok) return null
+
+    const data = await res.json()
+    if (!data.user) return null
+
+    return {
+      id: data.user.id,
+      email: data.user.email,
+      collection: data.user.collection || 'users',
+      sid: data.user.sessions?.[0]?.id,
+    }
   } catch {
     return null
   }
@@ -34,7 +51,6 @@ export async function getAuthPayload(): Promise<JWTPayload | null> {
 
 /**
  * Get the authenticated user or throw 401.
- * Use in API route handlers.
  */
 export async function requireAuth(): Promise<JWTPayload> {
   const payload = await getAuthPayload()
