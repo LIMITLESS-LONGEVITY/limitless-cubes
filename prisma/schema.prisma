@@ -1,0 +1,933 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ENUMS
+// ═══════════════════════════════════════════════════════════════
+
+enum ContentStatus {
+  draft
+  published
+  archived
+}
+
+enum ContentVisibility {
+  private
+  organization
+  community
+  marketplace
+}
+
+enum CoachRole {
+  head_coach
+  senior_coach
+  junior_coach
+}
+
+enum OrgPlan {
+  free
+  pro
+  team
+  business
+  enterprise
+}
+
+enum OrgStatus {
+  active
+  suspended
+  cancelled
+}
+
+enum MemberStatus {
+  invited
+  active
+  suspended
+  departed
+}
+
+enum AssignmentStatus {
+  pending
+  accepted
+  declined
+  in_progress
+  completed
+}
+
+enum ClientProgramStatus {
+  assigned
+  active
+  paused
+  completed
+  abandoned
+}
+
+enum ClientSessionStatus {
+  upcoming
+  in_progress
+  completed
+  skipped
+}
+
+enum NotificationType {
+  exercise_updated
+  session_updated
+  program_updated
+  assignment_created
+  assignment_status_changed
+  like_received
+  fork_received
+  client_completed
+  system
+}
+
+enum SharePermission {
+  view
+  duplicate
+}
+
+enum MediaType {
+  image
+  video
+  youtube
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ORGANIZATION & IDENTITY
+// ═══════════════════════════════════════════════════════════════
+
+model Organization {
+  id                   String    @id @default(uuid())
+  name                 String    @db.VarChar(255)
+  slug                 String    @unique @db.VarChar(100)
+  logoUrl              String?   @map("logo_url") @db.VarChar(500)
+  brandColors          Json?     @map("brand_colors")
+  plan                 OrgPlan   @default(free)
+  status               OrgStatus @default(active)
+  billingEmail         String?   @map("billing_email") @db.VarChar(255)
+  stripeCustomerId     String?   @map("stripe_customer_id") @db.VarChar(255)
+  defaultVisibility    ContentVisibility @default(organization) @map("default_visibility")
+  parentOrganizationId String?   @map("parent_organization_id")
+  settings             Json?
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt            DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt            DateTime? @map("deleted_at") @db.Timestamptz
+
+  parentOrganization Organization?  @relation("OrgHierarchy", fields: [parentOrganizationId], references: [id])
+  childOrganizations Organization[] @relation("OrgHierarchy")
+
+  members              OrganizationMember[]
+  invitations          OrganizationInvitation[]
+  domains              Domain[]
+  phases               Phase[]
+  difficultyLevels     DifficultyLevel[]
+  exercises            Exercise[]
+  sessions             Session[]
+  programs             Program[]
+  conversations        Conversation[]
+  contentShares        ContentShare[]
+  clients              Client[]
+  subscriptions        OrganizationSubscription[]
+
+  @@map("organizations")
+}
+
+/// Local user profile — synced from LIMITLESS SSO on first login.
+/// Role is platform-wide (not per-org). A Junior Coach is a Junior Coach everywhere.
+model User {
+  id                 String    @id @default(uuid())
+  externalUserId     String    @unique @map("external_user_id") @db.VarChar(255)
+  email              String    @unique @db.VarChar(255)
+  fullName           String    @map("full_name") @db.VarChar(255)
+  role               CoachRole @default(junior_coach)
+  avatarUrl          String?   @map("avatar_url") @db.VarChar(500)
+  shortDescription   String?   @map("short_description")
+  phone              String?   @db.VarChar(50)
+  domainsOfExpertise String[]  @default([]) @map("domains_of_expertise")
+  reputationScore    Int       @default(0) @map("reputation_score")
+  lastLoginAt        DateTime? @map("last_login_at") @db.Timestamptz
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt          DateTime? @map("deleted_at") @db.Timestamptz
+
+  memberships        OrganizationMember[]
+
+  createdExercises   Exercise[]
+  createdSessions    Session[]
+  createdPrograms    Program[]
+  createdDomains     Domain[]
+  createdPhases      Phase[]
+  createdDiffLevels  DifficultyLevel[]
+
+  exerciseLikes      ExerciseLike[]
+  sessionLikes       SessionLike[]
+  programLikes       ProgramLike[]
+
+  sessionAssignedBy  SessionAssignment[]  @relation("SessionAssigner")
+  sessionAssignedTo  SessionAssignment[]  @relation("SessionAssignee")
+  programAssignedBy  ProgramAssignment[]  @relation("ProgramAssigner")
+  programAssignedTo  ProgramAssignment[]  @relation("ProgramAssignee")
+
+  notifications      Notification[]       @relation("NotificationRecipient")
+  actedNotifications Notification[]       @relation("NotificationActor")
+
+  sentMessages       Message[]
+  conversationParts  ConversationParticipant[]
+  contentSharesBy    ContentShare[]
+  contentRatings     ContentRating[]
+  contentReports     ContentReport[]      @relation("Reporter")
+  reviewedReports    ContentReport[]      @relation("Reviewer")
+  invitationsSent    OrganizationInvitation[]
+
+  @@index([externalUserId])
+  @@map("users")
+}
+
+/// Membership junction. Coaching role is on User.role (platform-wide).
+/// Org-scoped permissions (owner, admin) are boolean flags here.
+model OrganizationMember {
+  id               String       @id @default(uuid())
+  organizationId   String       @map("organization_id")
+  userId           String       @map("user_id")
+  isOwner          Boolean      @default(false) @map("is_owner")
+  isAdmin          Boolean      @default(false) @map("is_admin")
+  status           MemberStatus @default(active)
+  joinedAt         DateTime     @default(now()) @map("joined_at") @db.Timestamptz
+  createdAt        DateTime     @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime     @updatedAt @map("updated_at") @db.Timestamptz
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  user         User         @relation(fields: [userId], references: [id])
+
+  @@unique([organizationId, userId])
+  @@index([userId])
+  @@map("organization_members")
+}
+
+/// Invitation to join an org. grantAdmin controls org-level permission.
+/// The invitee's coaching role (User.role) is managed separately by Platform Admin.
+model OrganizationInvitation {
+  id             String    @id @default(uuid())
+  organizationId String    @map("organization_id")
+  email          String    @db.VarChar(255)
+  grantAdmin     Boolean   @default(false) @map("grant_admin")
+  invitedBy      String    @map("invited_by")
+  token          String    @unique @db.VarChar(255)
+  expiresAt      DateTime  @map("expires_at") @db.Timestamptz
+  acceptedAt     DateTime? @map("accepted_at") @db.Timestamptz
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  inviter      User         @relation(fields: [invitedBy], references: [id])
+
+  @@index([email])
+  @@index([token])
+  @@map("organization_invitations")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TAXONOMY
+// ═══════════════════════════════════════════════════════════════
+
+model Domain {
+  id             String        @id @default(uuid())
+  name           String        @db.VarChar(100)
+  description    String?
+  status         ContentStatus @default(draft)
+  organizationId String?       @map("organization_id")
+  createdBy      String        @map("created_by")
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime      @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt      DateTime?     @map("deleted_at") @db.Timestamptz
+
+  organization Organization? @relation(fields: [organizationId], references: [id])
+  creator      User          @relation(fields: [createdBy], references: [id])
+
+  exerciseDomains ExerciseDomain[]
+  sessionDomains  SessionDomain[]
+  programDomains  ProgramDomain[]
+
+  @@unique([name, organizationId])
+  @@map("domains")
+}
+
+/// Structural phase within a session (Warm-up, Main, Cooldown, custom).
+/// Lives on the SessionExercise junction row, NOT on the Exercise itself.
+model Phase {
+  id             String   @id @default(uuid())
+  name           String   @db.VarChar(100)
+  sortOrder      Int      @map("sort_order")
+  isDefault      Boolean  @default(false) @map("is_default")
+  organizationId String?  @map("organization_id")
+  createdBy      String?  @map("created_by")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  organization     Organization?    @relation(fields: [organizationId], references: [id])
+  creator          User?            @relation(fields: [createdBy], references: [id])
+  sessionExercises SessionExercise[]
+
+  @@unique([name, organizationId])
+  @@map("phases")
+}
+
+model DifficultyLevel {
+  id             String   @id @default(uuid())
+  label          String   @db.VarChar(100)
+  sortOrder      Int      @map("sort_order")
+  organizationId String?  @map("organization_id")
+  createdBy      String   @map("created_by")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  organization Organization? @relation(fields: [organizationId], references: [id])
+  creator      User          @relation(fields: [createdBy], references: [id])
+
+  exercises Exercise[]
+  sessions  Session[]
+  programs  Program[]
+
+  @@unique([label, organizationId])
+  @@map("difficulty_levels")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CONTENT: EXERCISE (formerly Cube)
+// ═══════════════════════════════════════════════════════════════
+
+model Exercise {
+  id                 String            @id @default(uuid())
+  name               String            @db.VarChar(255)
+  description        String?
+  durationSeconds    Int               @map("duration_seconds")
+  difficultyLevelId  String?           @map("difficulty_level_id")
+  creatorNotes       String?           @map("creator_notes")
+  status             ContentStatus     @default(draft)
+  visibility         ContentVisibility @default(private)
+  version            Int               @default(1)
+  parentExerciseId   String?           @map("parent_exercise_id")
+  forkedFromId       String?           @map("forked_from_id")
+  allDomains         Boolean           @default(false) @map("all_domains")
+  isOrgTemplate      Boolean           @default(false) @map("is_org_template")
+  marketplacePrice   Decimal?          @map("marketplace_price") @db.Decimal(10, 2)
+  downloadCount      Int               @default(0) @map("download_count")
+  organizationId     String?           @map("organization_id")
+  createdBy          String            @map("created_by")
+  createdAt          DateTime          @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime          @updatedAt @map("updated_at") @db.Timestamptz
+  publishedAt        DateTime?         @map("published_at") @db.Timestamptz
+  deletedAt          DateTime?         @map("deleted_at") @db.Timestamptz
+
+  difficultyLevel  DifficultyLevel? @relation(fields: [difficultyLevelId], references: [id])
+  parentExercise   Exercise?        @relation("ExerciseVersions", fields: [parentExerciseId], references: [id])
+  versions         Exercise[]       @relation("ExerciseVersions")
+  forkedFrom       Exercise?        @relation("ExerciseForks", fields: [forkedFromId], references: [id])
+  forks            Exercise[]       @relation("ExerciseForks")
+  organization     Organization?    @relation(fields: [organizationId], references: [id])
+  creator          User             @relation(fields: [createdBy], references: [id])
+
+  domains          ExerciseDomain[]
+  media            ExerciseMedia[]
+  sessionExercises SessionExercise[]
+  likes            ExerciseLike[]
+  notifications    Notification[]   @relation("NotificationExercise")
+  contentShares    ContentShare[]   @relation("SharedExercise")
+  ratings          ContentRating[]  @relation("RatedExercise")
+
+  @@index([status, deletedAt])
+  @@index([createdBy])
+  @@index([organizationId])
+  @@index([parentExerciseId])
+  @@index([visibility])
+  @@map("exercises")
+}
+
+model ExerciseDomain {
+  exerciseId String @map("exercise_id")
+  domainId   String @map("domain_id")
+
+  exercise Exercise @relation(fields: [exerciseId], references: [id])
+  domain   Domain   @relation(fields: [domainId], references: [id])
+
+  @@id([exerciseId, domainId])
+  @@map("exercise_domains")
+}
+
+model ExerciseMedia {
+  id         String    @id @default(uuid())
+  exerciseId String    @map("exercise_id")
+  mediaType  MediaType @map("media_type")
+  url        String
+  publicId   String?   @map("public_id") @db.VarChar(255)
+  title      String?   @db.VarChar(255)
+  position   Int
+
+  exercise Exercise @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+
+  @@index([exerciseId])
+  @@map("exercise_media")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CONTENT: SESSION (formerly Routine)
+// ═══════════════════════════════════════════════════════════════
+
+model Session {
+  id                 String            @id @default(uuid())
+  name               String            @db.VarChar(255)
+  description        String?
+  durationSeconds    Int               @default(0) @map("duration_seconds")
+  difficultyLevelId  String?           @map("difficulty_level_id")
+  creatorNotes       String?           @map("creator_notes")
+  status             ContentStatus     @default(draft)
+  visibility         ContentVisibility @default(private)
+  version            Int               @default(1)
+  parentSessionId    String?           @map("parent_session_id")
+  forkedFromId       String?           @map("forked_from_id")
+  allDomains         Boolean           @default(false) @map("all_domains")
+  isOrgTemplate      Boolean           @default(false) @map("is_org_template")
+  isTemplate         Boolean           @default(false) @map("is_template")
+  templateCategory   String?           @map("template_category") @db.VarChar(100)
+  marketplacePrice   Decimal?          @map("marketplace_price") @db.Decimal(10, 2)
+  downloadCount      Int               @default(0) @map("download_count")
+  organizationId     String?           @map("organization_id")
+  createdBy          String            @map("created_by")
+  createdAt          DateTime          @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime          @updatedAt @map("updated_at") @db.Timestamptz
+  publishedAt        DateTime?         @map("published_at") @db.Timestamptz
+  deletedAt          DateTime?         @map("deleted_at") @db.Timestamptz
+
+  difficultyLevel  DifficultyLevel? @relation(fields: [difficultyLevelId], references: [id])
+  parentSession    Session?         @relation("SessionVersions", fields: [parentSessionId], references: [id])
+  sessionVersions  Session[]        @relation("SessionVersions")
+  forkedFrom       Session?         @relation("SessionForks", fields: [forkedFromId], references: [id])
+  forks            Session[]        @relation("SessionForks")
+  organization     Organization?    @relation(fields: [organizationId], references: [id])
+  creator          User             @relation(fields: [createdBy], references: [id])
+
+  domains           SessionDomain[]
+  sessionExercises  SessionExercise[]
+  programSessions   ProgramSession[]
+  likes             SessionLike[]
+  assignments       SessionAssignment[]
+  notifications     Notification[]    @relation("NotificationSession")
+  contentShares     ContentShare[]    @relation("SharedSession")
+  ratings           ContentRating[]   @relation("RatedSession")
+
+  @@index([status, deletedAt])
+  @@index([createdBy])
+  @@index([organizationId])
+  @@index([parentSessionId])
+  @@index([visibility])
+  @@map("sessions")
+}
+
+model SessionDomain {
+  sessionId String @map("session_id")
+  domainId  String @map("domain_id")
+
+  session Session @relation(fields: [sessionId], references: [id])
+  domain  Domain  @relation(fields: [domainId], references: [id])
+
+  @@id([sessionId, domainId])
+  @@map("session_domains")
+}
+
+/// Core composition junction. Each row = one exercise slot within a session.
+/// Phase, rest, override duration, sets, reps all live HERE, not on the Exercise.
+model SessionExercise {
+  id                      String  @id @default(uuid())
+  sessionId               String  @map("session_id")
+  exerciseId              String  @map("exercise_id")
+  position                Int
+  phaseId                 String? @map("phase_id")
+  restAfterSeconds        Int?    @map("rest_after_seconds")
+  overrideDurationSeconds Int?    @map("override_duration_seconds")
+  sets                    Int?
+  reps                    String? @db.VarChar(50)
+  notes                   String?
+
+  session  Session  @relation(fields: [sessionId], references: [id])
+  exercise Exercise @relation(fields: [exerciseId], references: [id])
+  phase    Phase?   @relation(fields: [phaseId], references: [id])
+
+  clientExerciseLogs ClientExerciseLog[]
+
+  @@index([sessionId, position])
+  @@map("session_exercises")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CONTENT: PROGRAM (formerly Super-Routine)
+// ═══════════════════════════════════════════════════════════════
+
+model Program {
+  id                 String            @id @default(uuid())
+  name               String            @db.VarChar(255)
+  description        String?
+  durationSeconds    Int               @default(0) @map("duration_seconds")
+  difficultyLevelId  String?           @map("difficulty_level_id")
+  creatorNotes       String?           @map("creator_notes")
+  status             ContentStatus     @default(draft)
+  visibility         ContentVisibility @default(private)
+  version            Int               @default(1)
+  parentProgramId    String?           @map("parent_program_id")
+  forkedFromId       String?           @map("forked_from_id")
+  allDomains         Boolean           @default(false) @map("all_domains")
+  isOrgTemplate      Boolean           @default(false) @map("is_org_template")
+  isTemplate         Boolean           @default(false) @map("is_template")
+  templateCategory   String?           @map("template_category") @db.VarChar(100)
+  marketplacePrice   Decimal?          @map("marketplace_price") @db.Decimal(10, 2)
+  downloadCount      Int               @default(0) @map("download_count")
+  organizationId     String?           @map("organization_id")
+  createdBy          String            @map("created_by")
+  createdAt          DateTime          @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime          @updatedAt @map("updated_at") @db.Timestamptz
+  publishedAt        DateTime?         @map("published_at") @db.Timestamptz
+  deletedAt          DateTime?         @map("deleted_at") @db.Timestamptz
+
+  difficultyLevel  DifficultyLevel? @relation(fields: [difficultyLevelId], references: [id])
+  parentProgram    Program?         @relation("ProgramVersions", fields: [parentProgramId], references: [id])
+  programVersions  Program[]        @relation("ProgramVersions")
+  forkedFrom       Program?         @relation("ProgramForks", fields: [forkedFromId], references: [id])
+  forks            Program[]        @relation("ProgramForks")
+  organization     Organization?    @relation(fields: [organizationId], references: [id])
+  creator          User             @relation(fields: [createdBy], references: [id])
+
+  domains          ProgramDomain[]
+  programSessions  ProgramSession[]
+  likes            ProgramLike[]
+  assignments      ProgramAssignment[]
+  notifications    Notification[]    @relation("NotificationProgram")
+  contentShares    ContentShare[]    @relation("SharedProgram")
+  ratings          ContentRating[]   @relation("RatedProgram")
+  clientAssignments ClientProgramAssignment[]
+
+  @@index([status, deletedAt])
+  @@index([createdBy])
+  @@index([organizationId])
+  @@index([parentProgramId])
+  @@index([visibility])
+  @@map("programs")
+}
+
+model ProgramDomain {
+  programId String @map("program_id")
+  domainId  String @map("domain_id")
+
+  program Program @relation(fields: [programId], references: [id])
+  domain  Domain  @relation(fields: [domainId], references: [id])
+
+  @@id([programId, domainId])
+  @@map("program_domains")
+}
+
+model ProgramSession {
+  id        String  @id @default(uuid())
+  programId String  @map("program_id")
+  sessionId String  @map("session_id")
+  position  Int
+  dayLabel  String? @map("day_label") @db.VarChar(100)
+  notes     String?
+
+  program Program @relation(fields: [programId], references: [id])
+  session Session @relation(fields: [sessionId], references: [id])
+
+  clientProgress ClientSessionProgress[]
+
+  @@index([programId, position])
+  @@map("program_sessions")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SOCIAL: LIKES (separate per entity type — real FKs, no polymorphism)
+// ═══════════════════════════════════════════════════════════════
+
+model ExerciseLike {
+  id         String   @id @default(uuid())
+  exerciseId String   @map("exercise_id")
+  userId     String   @map("user_id")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  exercise Exercise @relation(fields: [exerciseId], references: [id])
+  user     User     @relation(fields: [userId], references: [id])
+
+  @@unique([exerciseId, userId])
+  @@index([exerciseId])
+  @@map("exercise_likes")
+}
+
+model SessionLike {
+  id        String   @id @default(uuid())
+  sessionId String   @map("session_id")
+  userId    String   @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  session Session @relation(fields: [sessionId], references: [id])
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@unique([sessionId, userId])
+  @@index([sessionId])
+  @@map("session_likes")
+}
+
+model ProgramLike {
+  id        String   @id @default(uuid())
+  programId String   @map("program_id")
+  userId    String   @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  program Program @relation(fields: [programId], references: [id])
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@unique([programId, userId])
+  @@index([programId])
+  @@map("program_likes")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ASSIGNMENTS (separate per entity type)
+// ═══════════════════════════════════════════════════════════════
+
+model SessionAssignment {
+  id              String           @id @default(uuid())
+  sessionId       String           @map("session_id")
+  assignedBy      String           @map("assigned_by")
+  assignedTo      String           @map("assigned_to")
+  status          AssignmentStatus @default(pending)
+  dueDate         DateTime?        @map("due_date") @db.Timestamptz
+  notes           String?
+  responseNotes   String?          @map("response_notes")
+  completionNotes String?          @map("completion_notes")
+  respondedAt     DateTime?        @map("responded_at") @db.Timestamptz
+  completedAt     DateTime?        @map("completed_at") @db.Timestamptz
+  createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime         @updatedAt @map("updated_at") @db.Timestamptz
+
+  session  Session @relation(fields: [sessionId], references: [id])
+  assigner User    @relation("SessionAssigner", fields: [assignedBy], references: [id])
+  assignee User    @relation("SessionAssignee", fields: [assignedTo], references: [id])
+
+  notifications Notification[] @relation("NotificationSessionAssignment")
+
+  @@index([assignedTo, status])
+  @@index([assignedBy])
+  @@map("session_assignments")
+}
+
+model ProgramAssignment {
+  id              String           @id @default(uuid())
+  programId       String           @map("program_id")
+  assignedBy      String           @map("assigned_by")
+  assignedTo      String           @map("assigned_to")
+  status          AssignmentStatus @default(pending)
+  dueDate         DateTime?        @map("due_date") @db.Timestamptz
+  notes           String?
+  responseNotes   String?          @map("response_notes")
+  completionNotes String?          @map("completion_notes")
+  respondedAt     DateTime?        @map("responded_at") @db.Timestamptz
+  completedAt     DateTime?        @map("completed_at") @db.Timestamptz
+  createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime         @updatedAt @map("updated_at") @db.Timestamptz
+
+  program  Program @relation(fields: [programId], references: [id])
+  assigner User    @relation("ProgramAssigner", fields: [assignedBy], references: [id])
+  assignee User    @relation("ProgramAssignee", fields: [assignedTo], references: [id])
+
+  notifications Notification[] @relation("NotificationProgramAssignment")
+
+  @@index([assignedTo, status])
+  @@index([assignedBy])
+  @@map("program_assignments")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// NOTIFICATIONS
+// ═══════════════════════════════════════════════════════════════
+
+model Notification {
+  id                    String           @id @default(uuid())
+  userId                String           @map("user_id")
+  type                  NotificationType
+  message               String
+  exerciseId            String?          @map("exercise_id")
+  sessionId             String?          @map("session_id")
+  programId             String?          @map("program_id")
+  sessionAssignmentId   String?          @map("session_assignment_id")
+  programAssignmentId   String?          @map("program_assignment_id")
+  actorId               String?          @map("actor_id")
+  isRead                Boolean          @default(false) @map("is_read")
+  readAt                DateTime?        @map("read_at") @db.Timestamptz
+  createdAt             DateTime         @default(now()) @map("created_at") @db.Timestamptz
+
+  user                User               @relation("NotificationRecipient", fields: [userId], references: [id])
+  actor               User?              @relation("NotificationActor", fields: [actorId], references: [id])
+  exercise            Exercise?          @relation("NotificationExercise", fields: [exerciseId], references: [id])
+  session             Session?           @relation("NotificationSession", fields: [sessionId], references: [id])
+  program             Program?           @relation("NotificationProgram", fields: [programId], references: [id])
+  sessionAssignment   SessionAssignment? @relation("NotificationSessionAssignment", fields: [sessionAssignmentId], references: [id])
+  programAssignment   ProgramAssignment? @relation("NotificationProgramAssignment", fields: [programAssignmentId], references: [id])
+
+  @@index([userId, isRead])
+  @@index([userId, createdAt])
+  @@map("notifications")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CONTENT SHARING & COMMUNITY
+// ═══════════════════════════════════════════════════════════════
+
+model ContentShare {
+  id                    String          @id @default(uuid())
+  exerciseId            String?         @map("exercise_id")
+  sessionId             String?         @map("session_id")
+  programId             String?         @map("program_id")
+  sharedBy              String          @map("shared_by")
+  sharedWithOrganizationId String?      @map("shared_with_organization_id")
+  sharedWithUserId      String?         @map("shared_with_user_id")
+  permission            SharePermission @default(view)
+  createdAt             DateTime        @default(now()) @map("created_at") @db.Timestamptz
+  expiresAt             DateTime?       @map("expires_at") @db.Timestamptz
+
+  exercise             Exercise?     @relation("SharedExercise", fields: [exerciseId], references: [id])
+  session              Session?      @relation("SharedSession", fields: [sessionId], references: [id])
+  program              Program?      @relation("SharedProgram", fields: [programId], references: [id])
+  sharer               User          @relation(fields: [sharedBy], references: [id])
+  sharedWithOrg        Organization? @relation(fields: [sharedWithOrganizationId], references: [id])
+
+  @@map("content_shares")
+}
+
+model ContentRating {
+  id              String   @id @default(uuid())
+  exerciseId      String?  @map("exercise_id")
+  sessionId       String?  @map("session_id")
+  programId       String?  @map("program_id")
+  userId          String   @map("user_id")
+  rating          Int
+  reviewText      String?  @map("review_text")
+  creatorResponse String?  @map("creator_response")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  exercise Exercise? @relation("RatedExercise", fields: [exerciseId], references: [id])
+  session  Session?  @relation("RatedSession", fields: [sessionId], references: [id])
+  program  Program?  @relation("RatedProgram", fields: [programId], references: [id])
+  user     User      @relation(fields: [userId], references: [id])
+
+  @@map("content_ratings")
+}
+
+model ContentReport {
+  id          String   @id @default(uuid())
+  entityType  String   @map("entity_type") @db.VarChar(50)
+  entityId    String   @map("entity_id")
+  reporterId  String   @map("reporter_id")
+  reason      String   @db.VarChar(50)
+  description String?
+  status      String   @default("open") @db.VarChar(20)
+  reviewedBy  String?  @map("reviewed_by")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+  resolvedAt  DateTime? @map("resolved_at") @db.Timestamptz
+
+  reporter User  @relation("Reporter", fields: [reporterId], references: [id])
+  reviewer User? @relation("Reviewer", fields: [reviewedBy], references: [id])
+
+  @@map("content_reports")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// B2C: CLIENT TRAINING DELIVERY
+// ═══════════════════════════════════════════════════════════════
+
+/// Client profile — separate from User (coaches) for clean separation
+model Client {
+  id             String    @id @default(uuid())
+  externalUserId String    @unique @map("external_user_id") @db.VarChar(255)
+  email          String    @unique @db.VarChar(255)
+  fullName       String    @map("full_name") @db.VarChar(255)
+  avatarUrl      String?   @map("avatar_url") @db.VarChar(500)
+  organizationId String?   @map("organization_id")
+  digitalTwinId  String?   @map("digital_twin_id") @db.VarChar(255)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  organization        Organization?            @relation(fields: [organizationId], references: [id])
+  programAssignments  ClientProgramAssignment[]
+
+  @@index([organizationId])
+  @@map("clients")
+}
+
+model ClientProgramAssignment {
+  id         String              @id @default(uuid())
+  clientId   String              @map("client_id")
+  programId  String              @map("program_id")
+  assignedBy String              @map("assigned_by")
+  startDate  DateTime            @map("start_date") @db.Date
+  status     ClientProgramStatus @default(assigned)
+  notes      String?
+  createdAt  DateTime            @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt  DateTime            @updatedAt @map("updated_at") @db.Timestamptz
+
+  client   Client  @relation(fields: [clientId], references: [id])
+  program  Program @relation(fields: [programId], references: [id])
+
+  sessionProgress ClientSessionProgress[]
+
+  @@index([clientId, status])
+  @@map("client_program_assignments")
+}
+
+model ClientSessionProgress {
+  id                        String              @id @default(uuid())
+  clientProgramAssignmentId String              @map("client_program_assignment_id")
+  programSessionId          String              @map("program_session_id")
+  scheduledDate             DateTime?           @map("scheduled_date") @db.Date
+  status                    ClientSessionStatus @default(upcoming)
+  completedAt               DateTime?           @map("completed_at") @db.Timestamptz
+  durationSeconds           Int?                @map("duration_seconds")
+  subjectiveRPE             Int?                @map("subjective_rpe")
+  rating                    Int?
+  feedback                  String?
+  createdAt                 DateTime            @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt                 DateTime            @updatedAt @map("updated_at") @db.Timestamptz
+
+  clientProgramAssignment ClientProgramAssignment @relation(fields: [clientProgramAssignmentId], references: [id])
+  programSession          ProgramSession          @relation(fields: [programSessionId], references: [id])
+
+  exerciseLogs ClientExerciseLog[]
+
+  @@index([clientProgramAssignmentId])
+  @@map("client_session_progress")
+}
+
+model ClientExerciseLog {
+  id                      String    @id @default(uuid())
+  clientSessionProgressId String    @map("client_session_progress_id")
+  sessionExerciseId       String    @map("session_exercise_id")
+  completed               Boolean   @default(false)
+  actualSets              Int?      @map("actual_sets")
+  actualReps              String?   @map("actual_reps") @db.VarChar(50)
+  actualDurationSeconds   Int?      @map("actual_duration_seconds")
+  weight                  Decimal?  @db.Decimal(10, 2)
+  notes                   String?
+  completedAt             DateTime? @map("completed_at") @db.Timestamptz
+
+  clientSessionProgress ClientSessionProgress @relation(fields: [clientSessionProgressId], references: [id])
+  sessionExercise       SessionExercise       @relation(fields: [sessionExerciseId], references: [id])
+
+  @@map("client_exercise_logs")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MESSAGING (third-party recommended; minimal schema for fallback)
+// ═══════════════════════════════════════════════════════════════
+
+model Conversation {
+  id             String   @id @default(uuid())
+  isGroup        Boolean  @default(false) @map("is_group")
+  title          String?  @db.VarChar(255)
+  organizationId String?  @map("organization_id")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  organization Organization?            @relation(fields: [organizationId], references: [id])
+  participants ConversationParticipant[]
+  messages     Message[]
+
+  @@map("conversations")
+}
+
+model ConversationParticipant {
+  id             String    @id @default(uuid())
+  conversationId String    @map("conversation_id")
+  userId         String    @map("user_id")
+  lastReadAt     DateTime? @map("last_read_at") @db.Timestamptz
+  joinedAt       DateTime  @default(now()) @map("joined_at") @db.Timestamptz
+
+  conversation Conversation @relation(fields: [conversationId], references: [id])
+  user         User         @relation(fields: [userId], references: [id])
+
+  @@unique([conversationId, userId])
+  @@index([userId])
+  @@map("conversation_participants")
+}
+
+model Message {
+  id             String    @id @default(uuid())
+  conversationId String    @map("conversation_id")
+  senderId       String    @map("sender_id")
+  content        String
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt      DateTime? @map("deleted_at") @db.Timestamptz
+
+  conversation Conversation @relation(fields: [conversationId], references: [id])
+  sender       User         @relation(fields: [senderId], references: [id])
+
+  @@index([conversationId, createdAt])
+  @@map("messages")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// BILLING
+// ═══════════════════════════════════════════════════════════════
+
+model SubscriptionPlan {
+  id            String   @id @default(uuid())
+  name          String   @db.VarChar(100)
+  tier          OrgPlan
+  priceMonthly  Decimal  @map("price_monthly") @db.Decimal(10, 2)
+  priceAnnual   Decimal  @map("price_annual") @db.Decimal(10, 2)
+  maxCoaches    Int      @map("max_coaches")
+  maxClients    Int      @map("max_clients")
+  features      Json
+  stripePriceId String?  @map("stripe_price_id") @db.VarChar(255)
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  subscriptions OrganizationSubscription[]
+
+  @@map("subscription_plans")
+}
+
+model OrganizationSubscription {
+  id                   String    @id @default(uuid())
+  organizationId       String    @map("organization_id")
+  planId               String    @map("plan_id")
+  stripeSubscriptionId String?   @map("stripe_subscription_id") @db.VarChar(255)
+  status               String    @db.VarChar(50)
+  currentPeriodStart   DateTime  @map("current_period_start") @db.Timestamptz
+  currentPeriodEnd     DateTime  @map("current_period_end") @db.Timestamptz
+  cancelledAt          DateTime? @map("cancelled_at") @db.Timestamptz
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  organization Organization     @relation(fields: [organizationId], references: [id])
+  plan         SubscriptionPlan @relation(fields: [planId], references: [id])
+
+  @@index([organizationId])
+  @@map("organization_subscriptions")
+}
+
+model MarketplacePurchase {
+  id                    String   @id @default(uuid())
+  buyerId               String   @map("buyer_id")
+  entityType            String   @map("entity_type") @db.VarChar(50)
+  entityId              String   @map("entity_id")
+  sellerId              String   @map("seller_id")
+  price                 Decimal  @db.Decimal(10, 2)
+  currency              String   @default("USD") @db.VarChar(3)
+  platformFee           Decimal  @map("platform_fee") @db.Decimal(10, 2)
+  sellerRevenue         Decimal  @map("seller_revenue") @db.Decimal(10, 2)
+  stripePaymentIntentId String?  @map("stripe_payment_intent_id") @db.VarChar(255)
+  status                String   @db.VarChar(50)
+  createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@map("marketplace_purchases")
+}
