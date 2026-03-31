@@ -172,6 +172,95 @@ async function main() {
   }
   console.log(`Domains seeded: ${domainNames.join(', ')}`)
 
+  // ── 7. Subscription Plans ──────────────────────────────────
+  const plans: Array<{
+    tier: 'free' | 'pro' | 'team' | 'business' | 'enterprise'
+    name: string
+    priceMonthly: number
+    priceAnnual: number
+    maxCoaches: number
+    maxClients: number
+    features: string[]
+  }> = [
+    {
+      tier: 'free',
+      name: 'Free',
+      priceMonthly: 0,
+      priceAnnual: 0,
+      maxCoaches: 1,
+      maxClients: 3,
+      features: ['Full builder', 'Community library', '50 exercises', '10 programs'],
+    },
+    {
+      tier: 'pro',
+      name: 'Pro',
+      priceMonthly: 19,
+      priceAnnual: 190,
+      maxCoaches: 1,
+      maxClients: 25,
+      features: ['Unlimited content', 'Publish to community', 'Templates', 'Basic analytics', 'DT health context'],
+    },
+    {
+      tier: 'team',
+      name: 'Team',
+      priceMonthly: 79,
+      priceAnnual: 790,
+      maxCoaches: 10,
+      maxClients: 100,
+      features: ['Org library', 'Assignment workflows', 'Team analytics', 'Custom domains'],
+    },
+    {
+      tier: 'business',
+      name: 'Business',
+      priceMonthly: 199,
+      priceAnnual: 1990,
+      maxCoaches: 50,
+      maxClients: 500,
+      features: ['Advanced analytics', 'Custom branding', 'Priority support', 'API access', 'Marketplace'],
+    },
+    {
+      tier: 'enterprise',
+      name: 'Enterprise',
+      priceMonthly: 499,
+      priceAnnual: 4990,
+      maxCoaches: 999,
+      maxClients: 999,
+      features: ['Franchise hierarchy', 'SSO', 'SLA', 'Dedicated account manager', 'White-label'],
+    },
+  ]
+
+  for (const plan of plans) {
+    const existing = await prisma.subscriptionPlan.findFirst({ where: { tier: plan.tier } })
+    if (existing) {
+      await prisma.subscriptionPlan.update({
+        where: { id: existing.id },
+        data: {
+          name: plan.name,
+          priceMonthly: plan.priceMonthly,
+          priceAnnual: plan.priceAnnual,
+          maxCoaches: plan.maxCoaches,
+          maxClients: plan.maxClients,
+          features: plan.features,
+          active: true,
+        },
+      })
+    } else {
+      await prisma.subscriptionPlan.create({
+        data: {
+          tier: plan.tier,
+          name: plan.name,
+          priceMonthly: plan.priceMonthly,
+          priceAnnual: plan.priceAnnual,
+          maxCoaches: plan.maxCoaches,
+          maxClients: plan.maxClients,
+          features: plan.features,
+          active: true,
+        },
+      })
+    }
+  }
+  console.log(`Plans seeded: ${plans.map((p) => p.name).join(', ')}`)
+
   console.log('\nSeed complete.')
 }
 
