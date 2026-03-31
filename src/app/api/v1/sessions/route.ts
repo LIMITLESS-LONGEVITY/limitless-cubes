@@ -58,6 +58,7 @@ export async function GET(request: NextRequest) {
   const {
     search,
     status,
+    visibility,
     domainId,
     difficultyLevelId,
     organizationId,
@@ -71,6 +72,7 @@ export async function GET(request: NextRequest) {
   const where: Prisma.SessionWhereInput = {
     deletedAt: null,
     ...(status && { status }),
+    ...(visibility && { visibility }),
     ...(difficultyLevelId && { difficultyLevelId }),
     ...(organizationId && { organizationId }),
     ...(createdBy && { createdBy }),

@@ -1,5 +1,7 @@
 import { z } from 'zod/v4'
 
+export const contentVisibilitySchema = z.enum(['private', 'organization', 'community', 'marketplace'])
+
 export const createExerciseSchema = z.object({
   name: z.string().min(1).max(255),
   description: z.string().optional(),
@@ -8,6 +10,7 @@ export const createExerciseSchema = z.object({
   creatorNotes: z.string().optional(),
   allDomains: z.boolean().optional(),
   domainIds: z.array(z.string().uuid()).optional(),
+  visibility: contentVisibilitySchema.optional(),
 })
 
 export const updateExerciseSchema = createExerciseSchema.partial()
@@ -19,6 +22,7 @@ export const createSessionSchema = z.object({
   creatorNotes: z.string().optional(),
   allDomains: z.boolean().optional(),
   domainIds: z.array(z.string().uuid()).optional(),
+  visibility: contentVisibilitySchema.optional(),
   exercises: z.array(z.object({
     exerciseId: z.string().uuid(),
     position: z.number().int().min(0),
@@ -40,6 +44,7 @@ export const createProgramSchema = z.object({
   creatorNotes: z.string().optional(),
   allDomains: z.boolean().optional(),
   domainIds: z.array(z.string().uuid()).optional(),
+  visibility: contentVisibilitySchema.optional(),
   sessions: z.array(z.object({
     sessionId: z.string().uuid(),
     position: z.number().int().min(0),
@@ -51,6 +56,7 @@ export const createProgramSchema = z.object({
 export const listQuerySchema = z.object({
   search: z.string().optional(),
   status: z.enum(['draft', 'published', 'archived']).optional(),
+  visibility: contentVisibilitySchema.optional(),
   domainId: z.string().uuid().optional(),
   difficultyLevelId: z.string().uuid().optional(),
   organizationId: z.string().uuid().optional(),

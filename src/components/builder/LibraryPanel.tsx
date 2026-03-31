@@ -3,11 +3,11 @@
 import { useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useDraggable } from '@dnd-kit/core'
-import { Search, GripVertical, Clock, Dumbbell, Layers, FileDown } from 'lucide-react'
+import { Search, GripVertical, Clock, Dumbbell, Layers, FileDown, Globe, Heart, GitFork } from 'lucide-react'
 import { exerciseApi, sessionApi, type Exercise, type Session } from '@/hooks/use-api'
 import { useBuilderStore, type BuilderExercise } from '@/stores/builder-store'
 
-type LibraryTab = 'exercises' | 'sessions' | 'templates'
+type LibraryTab = 'exercises' | 'sessions' | 'templates' | 'community'
 
 interface LibraryPanelProps {
   mode: 'empty' | 'session' | 'program'
@@ -21,8 +21,8 @@ export function LibraryPanel({ mode, collapsed, onToggle }: LibraryPanelProps) {
 
   // Switch tab based on builder mode
   const availableTabs: LibraryTab[] = useMemo(() => {
-    if (mode === 'program') return ['sessions', 'templates']
-    return ['exercises', 'sessions', 'templates']
+    if (mode === 'program') return ['sessions', 'templates', 'community']
+    return ['exercises', 'sessions', 'templates', 'community']
   }, [mode])
 
   if (collapsed) {
@@ -76,6 +76,7 @@ export function LibraryPanel({ mode, collapsed, onToggle }: LibraryPanelProps) {
         {tab === 'exercises' && <ExerciseList search={search} />}
         {tab === 'sessions' && <SessionList search={search} />}
         {tab === 'templates' && <TemplateList search={search} />}
+        {tab === 'community' && <CommunityList search={search} mode={mode} />}
       </div>
     </div>
   )
@@ -276,6 +277,125 @@ function TemplateList({ search }: { search: string }) {
           </button>
         </div>
       ))}
+    </div>
+  )
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Community List — shows community-visibility content in sidebar
+// ═══════════════════════════════════════════════════════════════
+
+function CommunityList({ search, mode }: { search: string; mode: string }) {
+  // In program mode, show community sessions. Otherwise show community exercises.
+  const entityType = mode === 'program' ? 'sessions' : 'exercises'
+
+  const { data: exerciseData, isLoading: exLoading } = useQuery({
+    queryKey: ['community-exercises-panel', search],
+    queryFn: () => exerciseApi.list({ search, visibility: 'community', status: 'published', limit: '30' }),
+    enabled: entityType === 'exercises',
+  })
+
+  const { data: sessionData, isLoading: sessLoading } = useQuery({
+    queryKey: ['community-sessions-panel', search],
+    queryFn: () => sessionApi.list({ search, visibility: 'community', status: 'published', limit: '30' }),
+    enabled: entityType === 'sessions',
+  })
+
+  const isLoading = entityType === 'exercises' ? exLoading : sessLoading
+  if (isLoading) return <LoadingSkeleton />
+
+  if (entityType === 'exercises') {
+    if (!exerciseData?.data.length) return <EmptyState label="community exercises" />
+    return (
+      <div className="flex flex-col gap-1.5">
+        {exerciseData.data.map((exercise) => (
+          <CommunityExerciseCard key={exercise.id} exercise={exercise} />
+        ))}
+      </div>
+    )
+  }
+
+  if (!sessionData?.data.length) return <EmptyState label="community sessions" />
+  return (
+    <div className="flex flex-col gap-1.5">
+      {sessionData.data.map((session) => (
+        <CommunitySessionCard key={session.id} session={session} />
+      ))}
+    </div>
+  )
+}
+
+function CommunityExerciseCard({ exercise }: { exercise: Exercise }) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `community-exercise-${exercise.id}`,
+    data: {
+      type: 'exercise',
+      exerciseId: exercise.id,
+      name: exercise.name,
+      durationSeconds: exercise.durationSeconds,
+    },
+  })
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={`flex items-center gap-2 p-2 bg-neutral-900 border border-neutral-800 rounded-md cursor-grab active:cursor-grabbing hover:border-neutral-600 transition-colors ${
+        isDragging ? 'opacity-50' : ''
+      }`}
+      {...listeners}
+      {...attributes}
+    >
+      <GripVertical size={14} className="text-neutral-600 flex-shrink-0" />
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-neutral-200 truncate">{exercise.name}</p>
+        <div className="flex items-center gap-2 text-xs text-neutral-500">
+          <span className="flex items-center gap-1">
+            <Clock size={10} />
+            {formatDuration(exercise.durationSeconds)}
+          </span>
+          <span className="flex items-center gap-0.5">
+            <Heart size={9} /> {exercise._count.likes}
+          </span>
+        </div>
+      </div>
+      <Globe size={12} className="text-blue-500/50 flex-shrink-0" />
+    </div>
+  )
+}
+
+function CommunitySessionCard({ session }: { session: Session }) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `community-session-${session.id}`,
+    data: {
+      type: 'session',
+      sessionId: session.id,
+      name: session.name,
+      durationSeconds: session.durationSeconds,
+      exerciseCount: session.sessionExercises?.length ?? 0,
+    },
+  })
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={`flex items-center gap-2 p-2 bg-neutral-900 border border-neutral-800 rounded-md cursor-grab active:cursor-grabbing hover:border-neutral-600 transition-colors ${
+        isDragging ? 'opacity-50' : ''
+      }`}
+      {...listeners}
+      {...attributes}
+    >
+      <GripVertical size={14} className="text-neutral-600 flex-shrink-0" />
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-neutral-200 truncate">{session.name}</p>
+        <div className="flex items-center gap-2 text-xs text-neutral-500">
+          <span className="flex items-center gap-1">
+            <Clock size={10} />
+            {formatDuration(session.durationSeconds)}
+          </span>
+          <span>• {session.sessionExercises?.length ?? 0} exercises</span>
+        </div>
+      </div>
+      <Globe size={12} className="text-blue-500/50 flex-shrink-0" />
     </div>
   )
 }
