@@ -30,7 +30,7 @@ export function PropertiesPanel() {
       <div className="p-4 border-b border-neutral-800">
         <div className="flex items-center gap-2 mb-1">
           {isExercise ? (
-            <Dumbbell size={14} className="text-blue-400" />
+            <Dumbbell size={14} className="text-rose-500" />
           ) : (
             <Layers size={14} className="text-purple-400" />
           )}

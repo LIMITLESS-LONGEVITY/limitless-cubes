@@ -17,6 +17,113 @@ import {
   type BuilderItem,
 } from '@/stores/builder-store'
 
+// ═══════════════════════════════════════════════════════════════
+// Phase color helpers
+// ═══════════════════════════════════════════════════════════════
+
+type PhaseKey = 'warm-up' | 'warmup' | 'main' | 'cooldown' | 'cool-down' | 'custom'
+
+function getPhaseKey(phaseName: string | null): PhaseKey {
+  if (!phaseName) return 'custom'
+  const lower = phaseName.toLowerCase().replace(/[\s_-]+/g, '')
+  if (lower === 'warmup' || lower === 'warmup') return 'warmup'
+  if (lower === 'main' || lower === 'work' || lower === 'working') return 'main'
+  if (lower === 'cooldown' || lower === 'cooldown') return 'cooldown'
+  return 'custom'
+}
+
+function getPhaseColor(phaseName: string | null): string {
+  const key = getPhaseKey(phaseName)
+  switch (key) {
+    case 'warmup':
+    case 'warm-up':
+      return 'var(--phase-warmup)'
+    case 'main':
+      return 'var(--phase-main)'
+    case 'cooldown':
+    case 'cool-down':
+      return 'var(--phase-cooldown)'
+    default:
+      return 'var(--phase-custom)'
+  }
+}
+
+function getPhaseBg(phaseName: string | null): string {
+  const key = getPhaseKey(phaseName)
+  switch (key) {
+    case 'warmup':
+    case 'warm-up':
+      return 'var(--phase-warmup-bg)'
+    case 'main':
+      return 'var(--phase-main-bg)'
+    case 'cooldown':
+    case 'cool-down':
+      return 'var(--phase-cooldown-bg)'
+    default:
+      return 'var(--phase-custom-bg)'
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Duration → height calculation (Tetris scale)
+// ═══════════════════════════════════════════════════════════════
+
+const PX_PER_SECOND = 0.5
+const MIN_HEIGHT = 32
+const MAX_HEIGHT = 120
+
+function durationToHeight(seconds: number): number {
+  const raw = seconds * PX_PER_SECOND
+  return Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, raw))
+}
+
+function getExerciseTotalDuration(exercise: BuilderExercise): number {
+  const base = exercise.overrideDurationSeconds ?? exercise.durationSeconds
+  const sets = exercise.sets ?? 1
+  const rest = exercise.restAfterSeconds ?? 0
+  return base * sets + rest
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Phase zone grouping
+// ═══════════════════════════════════════════════════════════════
+
+interface PhaseGroup {
+  phaseId: string | null
+  phaseName: string | null
+  items: BuilderItem[]
+  totalDurationSeconds: number
+}
+
+function groupByPhase(items: BuilderItem[]): PhaseGroup[] {
+  const groups: PhaseGroup[] = []
+  let current: PhaseGroup | null = null
+
+  for (const item of items) {
+    const isExercise = 'exerciseId' in item
+    const phaseId = isExercise ? (item as BuilderExercise).phaseId : null
+    const phaseName = isExercise ? (item as BuilderExercise).phaseName : null
+
+    if (!current || current.phaseId !== phaseId) {
+      current = { phaseId, phaseName, items: [], totalDurationSeconds: 0 }
+      groups.push(current)
+    }
+
+    current.items.push(item)
+    if (isExercise) {
+      current.totalDurationSeconds += getExerciseTotalDuration(item as BuilderExercise)
+    } else {
+      current.totalDurationSeconds += (item as BuilderSession).durationSeconds
+    }
+  }
+
+  return groups
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Main Canvas
+// ═══════════════════════════════════════════════════════════════
+
 export function BuilderCanvas({ onSave }: { onSave?: () => void }) {
   const items = useBuilderStore((s) => s.items)
   const mode = useBuilderStore((s) => s.mode)
@@ -24,6 +131,8 @@ export function BuilderCanvas({ onSave }: { onSave?: () => void }) {
   const itemCount = useBuilderStore(selectItemCount)
 
   const { setNodeRef, isOver } = useDroppable({ id: 'builder-canvas' })
+
+  const phaseGroups = mode === 'session' ? groupByPhase(items) : null
 
   return (
     <div className="flex-1 flex flex-col h-full min-w-0">
@@ -35,7 +144,7 @@ export function BuilderCanvas({ onSave }: { onSave?: () => void }) {
           </span>
           {itemCount > 0 && (
             <span className="text-xs text-neutral-500">
-              {itemCount} {mode === 'session' ? 'exercises' : 'sessions'} • {formatDuration(totalDuration)}
+              {itemCount} {mode === 'session' ? 'exercises' : 'sessions'} &bull; {formatDuration(totalDuration)}
             </span>
           )}
         </div>
@@ -45,31 +154,80 @@ export function BuilderCanvas({ onSave }: { onSave?: () => void }) {
       {/* Drop zone */}
       <div
         ref={setNodeRef}
-        className={`flex-1 overflow-y-auto p-4 transition-colors ${
-          isOver ? 'bg-blue-500/5' : ''
-        }`}
+        className={`flex-1 overflow-y-auto p-4 transition-colors`}
+        style={{ background: isOver ? 'rgba(225, 29, 72, 0.03)' : 'var(--surface-canvas)' }}
       >
         {items.length === 0 ? (
           <EmptyCanvas />
         ) : (
           <SortableContext items={items.map((i) => i.slotId)} strategy={verticalListSortingStrategy}>
-            <div className="flex flex-col gap-2 max-w-2xl mx-auto">
-              {items.map((item, index) => (
-                <SortableItem key={item.slotId} item={item} index={index} />
-              ))}
+            <div className="flex flex-col max-w-2xl mx-auto">
+              {phaseGroups
+                ? phaseGroups.map((group, gi) => (
+                    <div key={`phase-${gi}`}>
+                      {/* Phase zone label */}
+                      {group.phaseName && (
+                        <div
+                          className="flex items-center gap-2 py-1.5 px-2 mb-1 mt-3 first:mt-0"
+                        >
+                          <div
+                            className="w-1.5 h-1.5 rounded-full"
+                            style={{ background: getPhaseColor(group.phaseName) }}
+                          />
+                          <span
+                            className="text-[10px] font-semibold uppercase tracking-widest"
+                            style={{ color: getPhaseColor(group.phaseName) }}
+                          >
+                            {group.phaseName} &mdash; {formatDuration(group.totalDurationSeconds)}
+                          </span>
+                        </div>
+                      )}
+                      <div className="flex flex-col gap-1">
+                        {group.items.map((item, index) => (
+                          <TetrisSortableItem key={item.slotId} item={item} />
+                        ))}
+                      </div>
+                    </div>
+                  ))
+                : (
+                  <div className="flex flex-col gap-1">
+                    {items.map((item) => (
+                      <TetrisSortableItem key={item.slotId} item={item} />
+                    ))}
+                  </div>
+                )
+              }
             </div>
           </SortableContext>
         )}
       </div>
+
+      {/* Total duration bar */}
+      {items.length > 0 && (
+        <div
+          className="flex items-center justify-between px-4 py-2 border-t border-neutral-800"
+          style={{ background: 'var(--surface-card)' }}
+        >
+          <div className="flex items-center gap-2">
+            <Clock size={12} className="text-neutral-500" />
+            <span className="text-xs font-medium text-neutral-300">
+              Total: {formatDuration(totalDuration)}
+            </span>
+          </div>
+          <span className="text-[10px] text-neutral-500">
+            {itemCount} {mode === 'session' ? 'exercises' : 'sessions'}
+          </span>
+        </div>
+      )}
     </div>
   )
 }
 
 // ═══════════════════════════════════════════════════════════════
-// Sortable Item
+// Tetris Sortable Item
 // ═══════════════════════════════════════════════════════════════
 
-function SortableItem({ item, index }: { item: BuilderItem; index: number }) {
+function TetrisSortableItem({ item }: { item: BuilderItem }) {
   const selectItem = useBuilderStore((s) => s.selectItem)
   const selectedSlotId = useBuilderStore((s) => s.selectedSlotId)
   const removeItem = useBuilderStore((s) => s.removeItem)
@@ -91,75 +249,108 @@ function SortableItem({ item, index }: { item: BuilderItem; index: number }) {
   const isExercise = 'exerciseId' in item
   const isSelected = selectedSlotId === item.slotId
 
+  const phaseName = isExercise ? (item as BuilderExercise).phaseName : null
+  const phaseColor = getPhaseColor(phaseName)
+  const phaseBg = getPhaseBg(phaseName)
+
+  const durationSeconds = isExercise
+    ? getExerciseTotalDuration(item as BuilderExercise)
+    : (item as BuilderSession).durationSeconds
+  const blockHeight = durationToHeight(durationSeconds)
+
+  const showSetsReps = blockHeight > 50
+
+  const ex = isExercise ? (item as BuilderExercise) : null
+  const sess = !isExercise ? (item as BuilderSession) : null
+
   return (
     <div
       ref={setNodeRef}
-      style={style}
-      className={`flex items-center gap-3 p-3 rounded-lg border transition-all ${
+      style={{
+        ...style,
+        minHeight: `${blockHeight}px`,
+        background: phaseBg,
+        borderLeft: `3px solid ${phaseColor}`,
+        outline: isSelected ? `2px solid ${phaseColor}` : 'none',
+        outlineOffset: isSelected ? '-1px' : undefined,
+      }}
+      className={`relative flex items-center gap-2 px-2 rounded-md transition-all cursor-pointer ${
         isDragging
-          ? 'opacity-50 scale-[1.02] shadow-lg'
-          : isSelected
-          ? 'border-blue-500 bg-blue-500/10'
-          : 'border-neutral-800 bg-neutral-900 hover:border-neutral-700'
+          ? 'opacity-50 scale-[1.02] shadow-lg z-10'
+          : 'hover:translate-x-0.5 hover:shadow-md hover:shadow-black/20'
       }`}
       onClick={() => selectItem(item.slotId)}
     >
-      {/* Drag handle */}
-      <div className="cursor-grab active:cursor-grabbing" {...attributes} {...listeners}>
-        <GripVertical size={16} className="text-neutral-600" />
+      {/* Grip handle */}
+      <div
+        className="cursor-grab active:cursor-grabbing text-neutral-600 hover:text-neutral-400 flex-shrink-0 select-none"
+        {...attributes}
+        {...listeners}
+      >
+        <span className="text-sm leading-none">&#10303;</span>
       </div>
 
-      {/* Index */}
-      <span className="w-6 h-6 rounded-full bg-neutral-800 flex items-center justify-center text-xs text-neutral-400 flex-shrink-0">
-        {index + 1}
-      </span>
-
       {/* Content */}
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 py-1.5">
         <div className="flex items-center gap-2">
           {isExercise ? (
-            <Dumbbell size={14} className="text-blue-400 flex-shrink-0" />
+            <Dumbbell size={12} style={{ color: phaseColor }} className="flex-shrink-0" />
           ) : (
-            <Layers size={14} className="text-purple-400 flex-shrink-0" />
+            <Layers size={12} className="text-purple-400 flex-shrink-0" />
           )}
           <p className="text-sm font-medium text-neutral-200 truncate">
             {item.name}
           </p>
         </div>
-        <div className="flex items-center gap-2 mt-0.5 text-xs text-neutral-500">
-          <span className="flex items-center gap-1">
-            <Clock size={10} />
-            {isExercise
-              ? formatExerciseDuration(item as BuilderExercise)
-              : formatDuration((item as BuilderSession).durationSeconds)}
-          </span>
-          {isExercise && (item as BuilderExercise).phaseName && (
-            <span className="px-1.5 py-0.5 rounded bg-neutral-800 text-neutral-400">
-              {(item as BuilderExercise).phaseName}
-            </span>
-          )}
-          {isExercise && (item as BuilderExercise).sets && (
-            <span>{(item as BuilderExercise).sets} sets</span>
-          )}
-          {isExercise && (item as BuilderExercise).reps && (
-            <span>× {(item as BuilderExercise).reps}</span>
-          )}
-          {!isExercise && (
-            <span>{(item as BuilderSession).exerciseCount} exercises</span>
-          )}
-        </div>
+
+        {/* Sets x reps — only on medium+ blocks */}
+        {showSetsReps && isExercise && (ex?.sets || ex?.reps) && (
+          <div className="flex items-center gap-1.5 mt-0.5 text-[11px] text-neutral-400">
+            {ex?.sets && <span>{ex.sets} sets</span>}
+            {ex?.sets && ex?.reps && <span>&times;</span>}
+            {ex?.reps && <span>{ex.reps}</span>}
+          </div>
+        )}
+
+        {/* Session info */}
+        {!isExercise && showSetsReps && (
+          <div className="text-[11px] text-neutral-400 mt-0.5">
+            {sess?.exerciseCount} exercises
+          </div>
+        )}
       </div>
 
-      {/* Remove button */}
-      <button
-        onClick={(e) => {
-          e.stopPropagation()
-          removeItem(item.slotId)
-        }}
-        className="p-1 text-neutral-600 hover:text-red-400 transition-colors"
-      >
-        <X size={14} />
-      </button>
+      {/* Right side: duration badge + phase pill */}
+      <div className="flex items-center gap-2 flex-shrink-0">
+        {/* Phase tag pill */}
+        {isExercise && phaseName && blockHeight > 40 && (
+          <span
+            className="px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wide"
+            style={{ color: phaseColor, background: `color-mix(in srgb, ${phaseColor} 15%, transparent)` }}
+          >
+            {phaseName}
+          </span>
+        )}
+
+        {/* Duration badge */}
+        <span
+          className="px-1.5 py-0.5 rounded text-[10px] font-semibold tabular-nums"
+          style={{ color: phaseColor, background: `color-mix(in srgb, ${phaseColor} 10%, transparent)` }}
+        >
+          {formatDuration(durationSeconds)}
+        </span>
+
+        {/* Remove button */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            removeItem(item.slotId)
+          }}
+          className="p-0.5 text-neutral-600 hover:text-red-400 transition-colors"
+        >
+          <X size={12} />
+        </button>
+      </div>
     </div>
   )
 }
@@ -203,7 +394,10 @@ function CanvasActions({ onSave }: { onSave?: () => void }) {
       {items.length > 0 && onSave && (
         <button
           onClick={onSave}
-          className="px-3 py-1 text-xs font-medium bg-blue-600 hover:bg-blue-500 text-white rounded-md transition-colors"
+          className="px-3 py-1 text-xs font-medium text-white rounded-md transition-colors"
+          style={{ background: 'var(--accent)' }}
+          onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--accent-hover)')}
+          onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--accent)')}
         >
           Save
         </button>
@@ -223,7 +417,10 @@ function EmptyCanvas() {
   return (
     <div className="h-full flex items-center justify-center">
       <div className="text-center max-w-sm">
-        <div className="w-16 h-16 rounded-2xl bg-neutral-900 border border-neutral-800 flex items-center justify-center mx-auto mb-4">
+        <div
+          className="w-16 h-16 rounded-2xl border border-neutral-800 flex items-center justify-center mx-auto mb-4"
+          style={{ background: 'var(--surface-card)' }}
+        >
           <Layers size={24} className="text-neutral-600" />
         </div>
         <h3 className="text-sm font-medium text-neutral-300 mb-1">Start building</h3>
@@ -245,12 +442,4 @@ function formatDuration(seconds: number): string {
   const remaining = seconds % 60
   if (remaining === 0) return `${minutes}m`
   return `${minutes}m ${remaining}s`
-}
-
-function formatExerciseDuration(exercise: BuilderExercise): string {
-  const base = exercise.overrideDurationSeconds ?? exercise.durationSeconds
-  const sets = exercise.sets ?? 1
-  const rest = exercise.restAfterSeconds ?? 0
-  const total = base * sets + rest
-  return formatDuration(total)
 }

@@ -86,7 +86,7 @@ export function Header() {
     >
       <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
         {/* Logo */}
-        <a href="/" className="text-xl font-semibold tracking-[0.12em] text-amber-400 hover:text-amber-300 transition-colors">
+        <a href="/" className="text-xl font-semibold tracking-[0.12em] text-rose-500 hover:text-rose-400 transition-colors">
           LIMITLESS
         </a>
 
@@ -101,7 +101,7 @@ export function Header() {
                 href={link.href}
                 className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
                   isActive
-                    ? 'text-amber-400'
+                    ? 'text-rose-500'
                     : 'text-neutral-400 hover:text-neutral-200'
                 }`}
               >
@@ -122,7 +122,7 @@ export function Header() {
               >
                 <Bell size={18} />
                 {unreadCount > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-amber-500 text-[10px] font-bold text-neutral-950 flex items-center justify-center">
+                  <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-rose-600 text-[10px] font-bold text-white flex items-center justify-center">
                     {unreadCount > 9 ? '9+' : unreadCount}
                   </span>
                 )}
@@ -171,7 +171,7 @@ export function Header() {
               </a>
               <a
                 href="/learn/create-account?redirect=/train"
-                className="px-3 py-1.5 text-sm font-medium border border-amber-500/50 text-amber-400 rounded-md hover:bg-amber-500/10 transition-colors"
+                className="px-3 py-1.5 text-sm font-medium border border-rose-500/50 text-rose-400 rounded-md hover:bg-rose-500/10 transition-colors"
               >
                 Get Started
               </a>

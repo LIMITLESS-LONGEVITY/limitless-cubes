@@ -45,7 +45,7 @@ export function LibraryPanel({ mode, collapsed, onToggle }: LibraryPanelProps) {
             onClick={() => setTab(t)}
             className={`flex-1 py-2 px-3 text-xs font-medium capitalize transition-colors ${
               tab === t
-                ? 'text-white border-b-2 border-blue-500'
+                ? 'text-white border-b-2 border-rose-600'
                 : 'text-neutral-400 hover:text-neutral-200'
             }`}
           >
@@ -66,7 +66,7 @@ export function LibraryPanel({ mode, collapsed, onToggle }: LibraryPanelProps) {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={`Search ${tab}...`}
-            className="w-full bg-neutral-900 border border-neutral-700 rounded-md pl-8 pr-3 py-1.5 text-sm text-neutral-200 placeholder:text-neutral-500 focus:outline-none focus:border-blue-500"
+            className="w-full bg-neutral-900 border border-neutral-700 rounded-md pl-8 pr-3 py-1.5 text-sm text-neutral-200 placeholder:text-neutral-500 focus:outline-none focus:border-rose-600"
           />
         </div>
       </div>
@@ -270,7 +270,7 @@ function TemplateList({ search }: { search: string }) {
           <button
             onClick={() => handleLoadTemplate(session.id)}
             disabled={loading === session.id}
-            className="p-1.5 text-neutral-500 hover:text-blue-400 transition-colors disabled:opacity-50"
+            className="p-1.5 text-neutral-500 hover:text-rose-400 transition-colors disabled:opacity-50"
             title="Load as template"
           >
             <FileDown size={14} className={loading === session.id ? 'animate-pulse' : ''} />
@@ -358,7 +358,7 @@ function CommunityExerciseCard({ exercise }: { exercise: Exercise }) {
           </span>
         </div>
       </div>
-      <Globe size={12} className="text-blue-500/50 flex-shrink-0" />
+      <Globe size={12} className="text-rose-500/50 flex-shrink-0" />
     </div>
   )
 }
@@ -395,7 +395,7 @@ function CommunitySessionCard({ session }: { session: Session }) {
           <span>• {session.sessionExercises?.length ?? 0} exercises</span>
         </div>
       </div>
-      <Globe size={12} className="text-blue-500/50 flex-shrink-0" />
+      <Globe size={12} className="text-rose-500/50 flex-shrink-0" />
     </div>
   )
 }
