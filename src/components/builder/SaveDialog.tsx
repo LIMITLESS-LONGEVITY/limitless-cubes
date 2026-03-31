@@ -212,7 +212,7 @@ export function SaveDialog({ open, onClose, onSaved }: SaveDialogProps) {
                     onClick={() => toggleDomain(domain.id)}
                     className={`px-2.5 py-1 text-xs rounded-full border transition-colors ${
                       selectedDomainIds.includes(domain.id)
-                        ? 'border-blue-500 bg-blue-500/20 text-blue-300'
+                        ? 'border-rose-500 bg-rose-500/20 text-rose-300'
                         : 'border-neutral-700 text-neutral-400 hover:border-neutral-500'
                     }`}
                   >
@@ -236,13 +236,13 @@ export function SaveDialog({ open, onClose, onSaved }: SaveDialogProps) {
                   onClick={() => setVisibility(option.value)}
                   className={`flex items-center gap-3 px-3 py-2 rounded-lg border text-left transition-colors ${
                     visibility === option.value
-                      ? 'border-blue-500 bg-blue-500/10'
+                      ? 'border-rose-500 bg-rose-500/10'
                       : 'border-neutral-700 hover:border-neutral-600'
                   }`}
                 >
-                  <Eye size={14} className={visibility === option.value ? 'text-blue-400' : 'text-neutral-500'} />
+                  <Eye size={14} className={visibility === option.value ? 'text-rose-400' : 'text-neutral-500'} />
                   <div>
-                    <p className={`text-xs font-medium ${visibility === option.value ? 'text-blue-300' : 'text-neutral-300'}`}>
+                    <p className={`text-xs font-medium ${visibility === option.value ? 'text-rose-300' : 'text-neutral-300'}`}>
                       {option.label}
                     </p>
                     <p className="text-[10px] text-neutral-500">{option.description}</p>
@@ -282,7 +282,7 @@ export function SaveDialog({ open, onClose, onSaved }: SaveDialogProps) {
           <button
             onClick={handleSave}
             disabled={saving}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-blue-600 hover:bg-blue-500 text-white rounded-lg disabled:opacity-50 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-rose-600 hover:bg-rose-500 text-white rounded-lg disabled:opacity-50 transition-colors"
           >
             {saving ? (
               <Loader2 size={14} className="animate-spin" />

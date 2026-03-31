@@ -77,7 +77,7 @@ function UsageBar({ label, icon: Icon, usage }: { label: string; icon: typeof Du
       {!isUnlimited && (
         <div className="w-full h-1.5 bg-neutral-800 rounded-full overflow-hidden">
           <div
-            className={`h-full rounded-full transition-all ${isNearLimit ? 'bg-amber-500' : 'bg-blue-500'}`}
+            className={`h-full rounded-full transition-all ${isNearLimit ? 'bg-amber-500' : 'bg-rose-500'}`}
             style={{ width: `${pct}%` }}
           />
         </div>
@@ -88,7 +88,7 @@ function UsageBar({ label, icon: Icon, usage }: { label: string; icon: typeof Du
 
 const planColors: Record<string, string> = {
   free: 'border-neutral-700',
-  pro: 'border-blue-800',
+  pro: 'border-rose-800',
   team: 'border-purple-800',
   business: 'border-amber-800',
   enterprise: 'border-emerald-800',
@@ -96,7 +96,7 @@ const planColors: Record<string, string> = {
 
 const planBadgeColors: Record<string, string> = {
   free: 'bg-neutral-700 text-neutral-300',
-  pro: 'bg-blue-900/50 text-blue-400',
+  pro: 'bg-rose-900/50 text-rose-400',
   team: 'bg-purple-900/50 text-purple-400',
   business: 'bg-amber-900/50 text-amber-400',
   enterprise: 'bg-emerald-900/50 text-emerald-400',
@@ -252,12 +252,12 @@ export default function BillingPage() {
                 return (
                   <div
                     key={plan.id}
-                    className={`bg-neutral-900 border rounded-lg p-5 ${isCurrent ? 'border-blue-600 ring-1 ring-blue-600/30' : planColors[plan.tier] ?? 'border-neutral-800'}`}
+                    className={`bg-neutral-900 border rounded-lg p-5 ${isCurrent ? 'border-rose-600 ring-1 ring-rose-600/30' : planColors[plan.tier] ?? 'border-neutral-800'}`}
                   >
                     <div className="flex items-center justify-between mb-3">
                       <h3 className="text-base font-semibold text-neutral-100">{plan.name}</h3>
                       {isCurrent && (
-                        <span className="px-2 py-0.5 text-[10px] font-medium bg-blue-600/20 text-blue-400 rounded-full">
+                        <span className="px-2 py-0.5 text-[10px] font-medium bg-rose-600/20 text-rose-400 rounded-full">
                           Current
                         </span>
                       )}
@@ -281,7 +281,7 @@ export default function BillingPage() {
                       <button
                         onClick={() => handleUpgrade(plan.tier)}
                         disabled={!!upgrading}
-                        className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors disabled:opacity-50"
+                        className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium bg-rose-600 hover:bg-rose-500 text-white rounded-lg transition-colors disabled:opacity-50"
                       >
                         {upgrading === plan.tier ? (
                           <Loader2 className="w-4 h-4 animate-spin" />

@@ -27,7 +27,7 @@ interface MeResponse {
 
 const roleColors: Record<string, string> = {
   head_coach: 'bg-amber-900/50 text-amber-400 border-amber-800/50',
-  senior_coach: 'bg-blue-900/50 text-blue-400 border-blue-800/50',
+  senior_coach: 'bg-rose-900/50 text-rose-400 border-rose-800/50',
   junior_coach: 'bg-neutral-800 text-neutral-400 border-neutral-700',
 }
 
@@ -188,7 +188,7 @@ function MemberCard({
             </span>
           )}
           {member.isAdmin && !member.isOwner && (
-            <span className="flex items-center gap-1 text-[10px] font-medium text-blue-400">
+            <span className="flex items-center gap-1 text-[10px] font-medium text-rose-400">
               <Shield className="w-3 h-3" /> Admin
             </span>
           )}
@@ -215,7 +215,7 @@ function MemberCard({
               disabled={isPending}
               className={`p-2 rounded-lg text-xs transition-colors ${
                 member.isAdmin
-                  ? 'text-blue-400 hover:bg-blue-900/30'
+                  ? 'text-rose-400 hover:bg-rose-900/30'
                   : 'text-neutral-500 hover:bg-neutral-800'
               } disabled:opacity-50`}
               title={member.isAdmin ? 'Revoke admin' : 'Grant admin'}
