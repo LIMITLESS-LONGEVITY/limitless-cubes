@@ -126,7 +126,7 @@ export default function InvitationsPage() {
               <button
                 type="submit"
                 disabled={createMutation.isPending || !email.trim()}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center gap-2 px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Send className="w-4 h-4" />
                 {createMutation.isPending ? 'Sending...' : 'Send Invite'}
@@ -138,7 +138,7 @@ export default function InvitationsPage() {
                 type="checkbox"
                 checked={grantAdmin}
                 onChange={(e) => setGrantAdmin(e.target.checked)}
-                className="w-4 h-4 rounded border-neutral-600 bg-neutral-800 text-blue-600 focus:ring-blue-500 focus:ring-offset-0"
+                className="w-4 h-4 rounded border-neutral-600 bg-neutral-800 text-rose-600 focus:ring-rose-500 focus:ring-offset-0"
               />
               <span className="flex items-center gap-1.5 text-sm text-neutral-400">
                 <Shield className="w-3.5 h-3.5" />
@@ -192,7 +192,7 @@ export default function InvitationsPage() {
                         {invitation.email}
                       </span>
                       {invitation.grantAdmin && (
-                        <span className="flex items-center gap-1 text-[10px] font-medium text-blue-400">
+                        <span className="flex items-center gap-1 text-[10px] font-medium text-rose-400">
                           <Shield className="w-3 h-3" /> Admin
                         </span>
                       )}

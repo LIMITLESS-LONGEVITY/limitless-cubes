@@ -72,7 +72,7 @@ export default function AdminPage() {
           </p>
           <Link
             href="/builder"
-            className="inline-block mt-6 px-4 py-2 text-sm font-medium text-blue-400 hover:text-blue-300 transition-colors"
+            className="inline-block mt-6 px-4 py-2 text-sm font-medium text-rose-400 hover:text-rose-300 transition-colors"
           >
             Back to Builder
           </Link>
@@ -87,7 +87,7 @@ export default function AdminPage() {
 
   const planColors: Record<string, string> = {
     free: 'bg-neutral-700 text-neutral-300',
-    pro: 'bg-blue-900/50 text-blue-400',
+    pro: 'bg-rose-900/50 text-rose-400',
     team: 'bg-purple-900/50 text-purple-400',
     business: 'bg-amber-900/50 text-amber-400',
     enterprise: 'bg-emerald-900/50 text-emerald-400',
@@ -98,7 +98,7 @@ export default function AdminPage() {
       label: 'Members',
       value: org?._count.members ?? 0,
       icon: Users,
-      color: 'text-blue-400',
+      color: 'text-rose-400',
     },
     {
       label: 'Exercises',
@@ -173,7 +173,7 @@ export default function AdminPage() {
                 </span>
               )}
               {adminMembership.isAdmin && !adminMembership.isOwner && (
-                <span className="flex items-center gap-1 text-xs text-blue-400">
+                <span className="flex items-center gap-1 text-xs text-rose-400">
                   <Shield className="w-3 h-3" /> Admin
                 </span>
               )}
@@ -209,7 +209,7 @@ export default function AdminPage() {
               className="group bg-neutral-900 border border-neutral-800 rounded-lg p-6 hover:border-neutral-700 transition-colors"
             >
               <div className="flex items-center justify-between mb-3">
-                <card.icon className="w-5 h-5 text-neutral-400 group-hover:text-blue-400 transition-colors" />
+                <card.icon className="w-5 h-5 text-neutral-400 group-hover:text-rose-400 transition-colors" />
                 <ArrowRight className="w-4 h-4 text-neutral-600 group-hover:text-neutral-400 transition-colors" />
               </div>
               <h3 className="text-base font-medium text-neutral-100 mb-1">{card.label}</h3>
