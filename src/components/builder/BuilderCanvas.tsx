@@ -17,7 +17,7 @@ import {
   type BuilderItem,
 } from '@/stores/builder-store'
 
-export function BuilderCanvas() {
+export function BuilderCanvas({ onSave }: { onSave?: () => void }) {
   const items = useBuilderStore((s) => s.items)
   const mode = useBuilderStore((s) => s.mode)
   const totalDuration = useBuilderStore(selectTotalDuration)
@@ -39,7 +39,7 @@ export function BuilderCanvas() {
             </span>
           )}
         </div>
-        <CanvasActions />
+        <CanvasActions onSave={onSave} />
       </div>
 
       {/* Drop zone */}
@@ -168,7 +168,7 @@ function SortableItem({ item, index }: { item: BuilderItem; index: number }) {
 // Canvas Actions (undo/redo/clear/save)
 // ═══════════════════════════════════════════════════════════════
 
-function CanvasActions() {
+function CanvasActions({ onSave }: { onSave?: () => void }) {
   const clear = useBuilderStore((s) => s.clear)
   const isDirty = useBuilderStore((s) => s.isDirty)
   const items = useBuilderStore((s) => s.items)
@@ -198,6 +198,14 @@ function CanvasActions() {
           className="px-2 py-1 text-xs text-neutral-500 hover:text-red-400"
         >
           Clear
+        </button>
+      )}
+      {items.length > 0 && onSave && (
+        <button
+          onClick={onSave}
+          className="px-3 py-1 text-xs font-medium bg-blue-600 hover:bg-blue-500 text-white rounded-md transition-colors"
+        >
+          Save
         </button>
       )}
       {isDirty && (

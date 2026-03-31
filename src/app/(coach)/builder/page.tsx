@@ -16,10 +16,12 @@ import { useBuilderStore } from '@/stores/builder-store'
 import { LibraryPanel } from '@/components/builder/LibraryPanel'
 import { BuilderCanvas } from '@/components/builder/BuilderCanvas'
 import { PropertiesPanel } from '@/components/builder/PropertiesPanel'
+import { SaveDialog } from '@/components/builder/SaveDialog'
 
 export default function BuilderPage() {
   const [libraryCollapsed, setLibraryCollapsed] = useState(false)
   const [activeId, setActiveId] = useState<string | null>(null)
+  const [saveOpen, setSaveOpen] = useState(false)
 
   const mode = useBuilderStore((s) => s.mode)
   const items = useBuilderStore((s) => s.items)
@@ -100,9 +102,18 @@ export default function BuilderPage() {
           collapsed={libraryCollapsed}
           onToggle={() => setLibraryCollapsed(!libraryCollapsed)}
         />
-        <BuilderCanvas />
+        <BuilderCanvas onSave={() => setSaveOpen(true)} />
         <PropertiesPanel />
       </div>
+
+      <SaveDialog
+        open={saveOpen}
+        onClose={() => setSaveOpen(false)}
+        onSaved={(id, type) => {
+          setSaveOpen(false)
+          // TODO: show success toast, optionally navigate to detail view
+        }}
+      />
 
       <DragOverlay>
         {activeId && (
