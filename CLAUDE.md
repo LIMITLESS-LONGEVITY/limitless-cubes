@@ -51,8 +51,19 @@ All API routes at `/api/v1/*`. RESTful pattern with Zod validation.
 - Start: `node .next/standalone/server.js`
 - Output mode: `standalone`
 
+## Multi-Instance Work Rule (NON-NEGOTIABLE)
+
+Main instance and workbench often work on this repo concurrently. To prevent duplicate work and merge conflicts:
+
+1. **Before writing ANY file**, check if it already exists with `ls` or `cat`. If it exists, READ it first and build on top of it — do NOT rewrite from scratch.
+2. **Handoffs will include a "DO NOT MODIFY" section** listing files the main instance has already written. Respect it.
+3. **New files only:** If a handoff asks you to "create" something, verify the file doesn't already exist. If it does, the task is to EXTEND it, not replace it.
+4. **API routes:** Check `src/app/api/v1/` for existing routes before creating new ones. Many routes were built by the main instance.
+5. **When in doubt:** Read the git log (`git log --oneline -10`) to see what was recently committed and by whom.
+
 ## Hard Constraints
 
 - NEVER commit `.env*`, `.claude/`, or temporary test files
+- NEVER rewrite existing files without reading them first
 - ALWAYS run `npx prisma generate` before building
 - ALWAYS use the fnm Node path before running any commands
