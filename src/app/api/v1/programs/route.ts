@@ -39,13 +39,14 @@ export async function GET(request: NextRequest) {
   }
 
   const {
-    search, status, domainId, difficultyLevelId, organizationId, createdBy,
+    search, status, visibility, domainId, difficultyLevelId, organizationId, createdBy,
     sortBy = 'createdAt', sortOrder = 'desc', page = 1, limit = 20,
   } = query.data
 
   const where: Prisma.ProgramWhereInput = {
     deletedAt: null,
     ...(status && { status }),
+    ...(visibility && { visibility }),
     ...(difficultyLevelId && { difficultyLevelId }),
     ...(organizationId && { organizationId }),
     ...(createdBy && { createdBy }),

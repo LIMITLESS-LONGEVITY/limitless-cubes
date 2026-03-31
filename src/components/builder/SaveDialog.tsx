@@ -3,8 +3,17 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { X, Save, Loader2 } from 'lucide-react'
+import { Eye } from 'lucide-react'
 import { useBuilderStore, selectTotalDuration, type BuilderExercise, type BuilderSession } from '@/stores/builder-store'
 import { sessionApi, programApi, taxonomyApi } from '@/hooks/use-api'
+
+type ContentVisibility = 'private' | 'organization' | 'community'
+
+const VISIBILITY_OPTIONS: Array<{ value: ContentVisibility; label: string; description: string }> = [
+  { value: 'private', label: 'Private', description: 'Only visible to you' },
+  { value: 'organization', label: 'Organization', description: 'Visible to your organization' },
+  { value: 'community', label: 'Community', description: 'Visible to all coaches' },
+]
 
 interface SaveDialogProps {
   open: boolean
@@ -23,6 +32,7 @@ export function SaveDialog({ open, onClose, onSaved }: SaveDialogProps) {
   const [description, setDescription] = useState('')
   const [difficultyLevelId, setDifficultyLevelId] = useState('')
   const [selectedDomainIds, setSelectedDomainIds] = useState<string[]>([])
+  const [visibility, setVisibility] = useState<ContentVisibility>('organization')
   const [creatorNotes, setCreatorNotes] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -59,6 +69,7 @@ export function SaveDialog({ open, onClose, onSaved }: SaveDialogProps) {
         description: description || undefined,
         difficultyLevelId: difficultyLevelId || undefined,
         domainIds: selectedDomainIds.length > 0 ? selectedDomainIds : undefined,
+        visibility,
         creatorNotes: creatorNotes || undefined,
       }
 
@@ -211,6 +222,35 @@ export function SaveDialog({ open, onClose, onSaved }: SaveDialogProps) {
               </div>
             </div>
           )}
+
+          {/* Visibility */}
+          <div>
+            <label className="text-xs font-medium text-neutral-400 mb-1.5 block">
+              Visibility
+            </label>
+            <div className="flex flex-col gap-1.5">
+              {VISIBILITY_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setVisibility(option.value)}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-lg border text-left transition-colors ${
+                    visibility === option.value
+                      ? 'border-blue-500 bg-blue-500/10'
+                      : 'border-neutral-700 hover:border-neutral-600'
+                  }`}
+                >
+                  <Eye size={14} className={visibility === option.value ? 'text-blue-400' : 'text-neutral-500'} />
+                  <div>
+                    <p className={`text-xs font-medium ${visibility === option.value ? 'text-blue-300' : 'text-neutral-300'}`}>
+                      {option.label}
+                    </p>
+                    <p className="text-[10px] text-neutral-500">{option.description}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
 
           {/* Creator Notes */}
           <div>

@@ -63,6 +63,10 @@ export const exerciseApi = {
     apiFetch<Exercise>(`/api/v1/exercises/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   delete: (id: string) =>
     apiFetch<{ message: string }>(`/api/v1/exercises/${id}`, { method: 'DELETE' }),
+  like: (id: string) =>
+    apiFetch<{ liked: boolean }>(`/api/v1/exercises/${id}/like`, { method: 'POST' }),
+  fork: (id: string) =>
+    apiFetch<Exercise>(`/api/v1/exercises/${id}/fork`, { method: 'POST' }),
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -107,6 +111,10 @@ export const sessionApi = {
     apiFetch<Session>(`/api/v1/sessions/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   delete: (id: string) =>
     apiFetch<{ message: string }>(`/api/v1/sessions/${id}`, { method: 'DELETE' }),
+  like: (id: string) =>
+    apiFetch<{ liked: boolean }>(`/api/v1/sessions/${id}/like`, { method: 'POST' }),
+  fork: (id: string) =>
+    apiFetch<Session>(`/api/v1/sessions/${id}/fork`, { method: 'POST' }),
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -146,6 +154,10 @@ export const programApi = {
     apiFetch<Program>(`/api/v1/programs/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   delete: (id: string) =>
     apiFetch<{ message: string }>(`/api/v1/programs/${id}`, { method: 'DELETE' }),
+  like: (id: string) =>
+    apiFetch<{ liked: boolean }>(`/api/v1/programs/${id}/like`, { method: 'POST' }),
+  fork: (id: string) =>
+    apiFetch<Program>(`/api/v1/programs/${id}/fork`, { method: 'POST' }),
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -175,4 +187,84 @@ export const taxonomyApi = {
   domains: () => apiFetch<Domain[]>('/api/v1/domains'),
   phases: () => apiFetch<Phase[]>('/api/v1/phases'),
   difficultyLevels: () => apiFetch<DifficultyLevel[]>('/api/v1/difficulty-levels'),
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Organization API
+// ═══════════════════════════════════════════════════════════════
+
+export interface OrgSummary {
+  id: string
+  name: string
+  slug: string
+  logoUrl: string | null
+  plan: string
+  status: string
+  defaultVisibility: string
+  isOwner: boolean
+  isAdmin: boolean
+  _count: { members: number; exercises: number; sessions: number; programs: number }
+}
+
+export interface OrgDetail {
+  id: string
+  name: string
+  slug: string
+  logoUrl: string | null
+  plan: string
+  status: string
+  defaultVisibility: string
+  brandColors: unknown
+  billingEmail: string | null
+  isOwner: boolean
+  isAdmin: boolean
+  _count: { members: number; exercises: number; sessions: number; programs: number; invitations: number }
+}
+
+export interface OrgMember {
+  id: string
+  organizationId: string
+  userId: string
+  isOwner: boolean
+  isAdmin: boolean
+  status: string
+  joinedAt: string
+  user: {
+    id: string
+    fullName: string
+    email: string
+    avatarUrl: string | null
+    role: string
+  }
+}
+
+export interface OrgInvitation {
+  id: string
+  organizationId: string
+  email: string
+  grantAdmin: boolean
+  invitedBy: string
+  token: string
+  expiresAt: string
+  acceptedAt: string | null
+  createdAt: string
+  status: 'pending' | 'accepted' | 'expired'
+  inviter: { id: string; fullName: string; email: string }
+}
+
+export const organizationApi = {
+  list: () =>
+    apiFetch<{ data: OrgSummary[] }>('/api/v1/organizations'),
+  get: (id: string) =>
+    apiFetch<OrgDetail>(`/api/v1/organizations/${id}`),
+  update: (id: string, data: Record<string, unknown>) =>
+    apiFetch<OrgDetail>(`/api/v1/organizations/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  members: (id: string) =>
+    apiFetch<{ data: OrgMember[] }>(`/api/v1/organizations/${id}/members`),
+  updateMember: (orgId: string, data: Record<string, unknown>) =>
+    apiFetch<OrgMember>(`/api/v1/organizations/${orgId}/members`, { method: 'PATCH', body: JSON.stringify(data) }),
+  invitations: (id: string) =>
+    apiFetch<{ data: OrgInvitation[] }>(`/api/v1/organizations/${id}/invitations`),
+  createInvitation: (orgId: string, data: { email: string; grantAdmin: boolean }) =>
+    apiFetch<OrgInvitation>(`/api/v1/organizations/${orgId}/invitations`, { method: 'POST', body: JSON.stringify(data) }),
 }

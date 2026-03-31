@@ -7,66 +7,80 @@ interface RouteParams {
 }
 
 /**
- * GET /api/v1/organizations/:id — Get organization details
+ * GET /api/v1/organizations/:id — Get organization detail
  */
 export async function GET(request: NextRequest, { params }: RouteParams) {
   const { id } = await params
   const auth = await getAuthenticatedUser()
   if ('error' in auth) return auth.error
 
-  // Must be a member
-  const membership = auth.user.memberships.find(
-    (m) => m.organizationId === id
-  )
-  if (!membership) return errorResponse('Not a member of this organization', 403)
+  // Verify membership
+  const membership = auth.user.memberships.find((m) => m.organizationId === id)
+  if (!membership) {
+    return errorResponse('Organization not found or not a member', 404)
+  }
 
-  const org = await prisma.organization.findFirst({
-    where: { id, deletedAt: null },
+  const org = await prisma.organization.findUnique({
+    where: { id },
     include: {
-      members: {
-        where: { status: 'active' },
-        include: {
-          user: { select: { id: true, fullName: true, email: true, avatarUrl: true, role: true } },
-        },
-      },
       _count: {
-        select: { exercises: true, sessions: true, programs: true, clients: true },
+        select: {
+          members: true,
+          exercises: true,
+          sessions: true,
+          programs: true,
+          invitations: true,
+        },
       },
     },
   })
 
-  if (!org) return errorResponse('Organization not found', 404)
+  if (!org) {
+    return errorResponse('Organization not found', 404)
+  }
 
   return successResponse({
     ...org,
-    currentUserIsOwner: membership.isOwner,
-    currentUserIsAdmin: membership.isAdmin,
+    isOwner: membership.isOwner,
+    isAdmin: membership.isAdmin,
   })
 }
 
 /**
- * PATCH /api/v1/organizations/:id — Update org settings (Owner/Admin only)
+ * PATCH /api/v1/organizations/:id — Update organization settings
  */
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   const { id } = await params
   const auth = await getAuthenticatedUser()
   if ('error' in auth) return auth.error
 
-  const membership = auth.user.memberships.find(
-    (m) => m.organizationId === id && (m.isOwner || m.isAdmin)
-  )
-  if (!membership) return errorResponse('Owner or Admin required', 403)
+  // Only owner or admin can update
+  const membership = auth.user.memberships.find((m) => m.organizationId === id)
+  if (!membership || (!membership.isOwner && !membership.isAdmin)) {
+    return errorResponse('Admin access required', 403)
+  }
 
   const body = await request.json()
-  const allowedFields = ['name', 'logoUrl', 'brandColors', 'settings', 'defaultVisibility']
-  const data: Record<string, unknown> = {}
-  for (const field of allowedFields) {
-    if (field in body) data[field] = body[field]
-  }
+  const { name, logoUrl, defaultVisibility } = body
+
+  const updateData: Record<string, unknown> = {}
+  if (name !== undefined) updateData.name = name
+  if (logoUrl !== undefined) updateData.logoUrl = logoUrl
+  if (defaultVisibility !== undefined) updateData.defaultVisibility = defaultVisibility
 
   const org = await prisma.organization.update({
     where: { id },
-    data,
+    data: updateData,
+    include: {
+      _count: {
+        select: {
+          members: true,
+          exercises: true,
+          sessions: true,
+          programs: true,
+        },
+      },
+    },
   })
 
   return successResponse(org)
