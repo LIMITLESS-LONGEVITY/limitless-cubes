@@ -32,6 +32,8 @@ export async function GET() {
     tokenFirst20: token?.slice(0, 20) ?? null,
     hasSecret: !!secret,
     secretLength: secret?.length ?? 0,
+    secretFirst10: secret?.slice(0, 10) ?? null,
+    secretLast10: secret?.slice(-10) ?? null,
     decoded: decoded ? { id: (decoded as Record<string, unknown>).id, email: (decoded as Record<string, unknown>).email } : null,
     verifyError,
   })

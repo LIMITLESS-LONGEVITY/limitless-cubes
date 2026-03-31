@@ -1,16 +1,18 @@
-import jwt from 'jsonwebtoken'
+import { jwtVerify } from 'jose'
 import { cookies } from 'next/headers'
 
 export interface JWTPayload {
   id: number
   email: string
   collection: string
+  sid?: string
   iat: number
   exp: number
 }
 
 /**
  * Validate the shared payload-token cookie from LIMITLESS SSO.
+ * Uses jose library (same as Payload CMS) for JWT verification.
  * Returns the decoded JWT payload or null if invalid/missing.
  */
 export async function getAuthPayload(): Promise<JWTPayload | null> {
@@ -21,7 +23,10 @@ export async function getAuthPayload(): Promise<JWTPayload | null> {
   try {
     const secret = process.env.PAYLOAD_SECRET
     if (!secret) throw new Error('PAYLOAD_SECRET not configured')
-    return jwt.verify(token, secret) as JWTPayload
+
+    const secretKey = new TextEncoder().encode(secret)
+    const { payload } = await jwtVerify(token, secretKey)
+    return payload as unknown as JWTPayload
   } catch {
     return null
   }
