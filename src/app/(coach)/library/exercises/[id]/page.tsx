@@ -11,6 +11,8 @@ import {
   Pencil,
   Dumbbell,
   Star,
+  Film,
+  Image as ImageIcon,
 } from 'lucide-react'
 import { exerciseApi } from '@/hooks/use-api'
 
@@ -163,6 +165,47 @@ export default function ExerciseDetailPage() {
           </div>
         )}
 
+        {/* Media */}
+        {exercise.media && exercise.media.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-sm font-medium text-neutral-300 mb-3">Media</h2>
+            <div className="flex flex-col gap-3">
+              {exercise.media.map((m) => (
+                <div key={m.id}>
+                  {m.mediaType === 'youtube' ? (
+                    <div className="relative w-full aspect-video rounded-lg overflow-hidden" style={{ background: '#000' }}>
+                      <iframe
+                        src={toYouTubeEmbedUrl(m.url)}
+                        title={m.title || 'YouTube video'}
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                        className="absolute inset-0 w-full h-full"
+                      />
+                    </div>
+                  ) : m.mediaType === 'image' ? (
+                    <img
+                      src={m.url}
+                      alt={m.title || 'Exercise image'}
+                      className="w-full rounded-lg object-cover"
+                      style={{ maxHeight: '400px' }}
+                    />
+                  ) : (
+                    <div
+                      className="flex items-center gap-2 p-3 rounded-lg"
+                      style={{ background: 'var(--surface-card)', border: '1px solid #222' }}
+                    >
+                      <Film size={16} className="text-neutral-400" />
+                      <a href={m.url} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-400 hover:underline truncate">
+                        {m.url}
+                      </a>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Stats */}
         <div
           className="flex items-center gap-6 p-4 rounded-lg mb-8"
@@ -218,7 +261,7 @@ export default function ExerciseDetailPage() {
             Fork
           </button>
           <button
-            onClick={() => router.push(`/builder?exerciseId=${id}`)}
+            onClick={() => router.push(`/library/exercises/${id}/edit`)}
             className="flex items-center gap-2 px-5 py-2.5 text-sm font-medium rounded-lg transition-colors"
             style={{
               background: 'transparent',
@@ -233,6 +276,28 @@ export default function ExerciseDetailPage() {
       </div>
     </div>
   )
+}
+
+function toYouTubeEmbedUrl(url: string): string {
+  try {
+    const u = new URL(url)
+    // Handle youtu.be/ID
+    if (u.hostname === 'youtu.be') {
+      return `https://www.youtube.com/embed${u.pathname}`
+    }
+    // Handle youtube.com/watch?v=ID
+    const v = u.searchParams.get('v')
+    if (v) {
+      return `https://www.youtube.com/embed/${v}`
+    }
+    // Already an embed URL or unknown format
+    if (u.pathname.startsWith('/embed/')) {
+      return url
+    }
+  } catch {
+    // not a valid URL
+  }
+  return url
 }
 
 function formatDuration(seconds: number): string {
