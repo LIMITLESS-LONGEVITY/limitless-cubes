@@ -45,6 +45,14 @@ export async function POST(request: NextRequest) {
         await handleSubscriptionDeleted(event.data.object as Stripe.Subscription)
         break
 
+      case 'account.updated':
+        await handleAccountUpdated(event.data.object as Stripe.Account)
+        break
+
+      case 'transfer.created':
+        await handleTransferCreated(event.data.object as Stripe.Transfer)
+        break
+
       default:
         // Unhandled event type — log and acknowledge
         console.log(`Unhandled Stripe event: ${event.type}`)
@@ -58,6 +66,12 @@ export async function POST(request: NextRequest) {
 }
 
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
+  // Check if this is a marketplace purchase (has entityType in metadata)
+  if (session.metadata?.entityType) {
+    await handleMarketplacePurchase(session)
+    return
+  }
+
   const organizationId = session.metadata?.organizationId
   const planId = session.metadata?.planId
   const subscriptionId = session.subscription as string
@@ -130,5 +144,80 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
   await prisma.organization.update({
     where: { id: sub.organizationId },
     data: { plan: 'free' },
+  })
+}
+
+async function handleMarketplacePurchase(session: Stripe.Checkout.Session) {
+  const { entityType, entityId, buyerId, sellerId } = session.metadata!
+  if (!entityType || !entityId || !buyerId || !sellerId) {
+    console.error('Marketplace checkout missing metadata:', session.id)
+    return
+  }
+
+  const price = (session.amount_total ?? 0) / 100
+  const platformFee = price * 0.20
+  const sellerRevenue = price - platformFee
+
+  await prisma.marketplacePurchase.create({
+    data: {
+      buyerId,
+      entityType,
+      entityId,
+      sellerId,
+      price,
+      currency: 'USD',
+      platformFee,
+      sellerRevenue,
+      stripePaymentIntentId: session.payment_intent as string,
+      status: 'completed',
+    },
+  })
+
+  // Increment download count
+  if (entityType === 'session') {
+    await prisma.session.update({
+      where: { id: entityId },
+      data: { downloadCount: { increment: 1 } },
+    })
+  } else if (entityType === 'program') {
+    await prisma.program.update({
+      where: { id: entityId },
+      data: { downloadCount: { increment: 1 } },
+    })
+  }
+
+  // Notify seller
+  const entity = entityType === 'session'
+    ? await prisma.session.findUnique({ where: { id: entityId }, select: { name: true } })
+    : await prisma.program.findUnique({ where: { id: entityId }, select: { name: true } })
+
+  await prisma.notification.create({
+    data: {
+      userId: sellerId,
+      actorId: buyerId,
+      type: 'system',
+      message: `Someone purchased your ${entityType} "${entity?.name ?? 'Unknown'}"`,
+    },
+  })
+}
+
+async function handleAccountUpdated(account: Stripe.Account) {
+  const chargesEnabled = account.charges_enabled ?? false
+  const payoutsEnabled = account.payouts_enabled ?? false
+  const onboarded = chargesEnabled && payoutsEnabled
+
+  await prisma.user.updateMany({
+    where: { stripeConnectAccountId: account.id },
+    data: { stripeConnectOnboarded: onboarded },
+  })
+}
+
+async function handleTransferCreated(transfer: Stripe.Transfer) {
+  const paymentIntentId = transfer.source_transaction as string | null
+  if (!paymentIntentId) return
+
+  await prisma.marketplacePurchase.updateMany({
+    where: { stripePaymentIntentId: paymentIntentId },
+    data: { stripeTransferId: transfer.id },
   })
 }

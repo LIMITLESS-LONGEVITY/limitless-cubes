@@ -22,3 +22,11 @@ export const PLAN_LIMITS = {
 // -1 means unlimited
 
 export type PlanTier = keyof typeof PLAN_LIMITS
+
+/**
+ * Check if an org plan allows selling on the marketplace.
+ * Free tier cannot sell — all paid tiers can.
+ */
+export function canSellOnMarketplace(orgPlan: string): boolean {
+  return orgPlan !== 'free'
+}
