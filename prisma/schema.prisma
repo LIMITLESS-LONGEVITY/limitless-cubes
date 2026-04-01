@@ -27,6 +27,7 @@ enum CoachRole {
   head_coach
   senior_coach
   junior_coach
+  athlete
 }
 
 enum OrgPlan {
@@ -137,24 +138,28 @@ model Organization {
 }
 
 /// Local user profile — synced from LIMITLESS SSO on first login.
-/// Role is platform-wide (not per-org). A Junior Coach is a Junior Coach everywhere.
+/// Role is platform-wide. New users default to athlete (consumer).
+/// Coach roles (junior_coach+) assigned via org invitation or upgrade.
 model User {
   id                 String    @id @default(uuid())
   externalUserId     String    @unique @map("external_user_id") @db.VarChar(255)
   email              String    @unique @db.VarChar(255)
   fullName           String    @map("full_name") @db.VarChar(255)
-  role               CoachRole @default(junior_coach)
+  role               CoachRole @default(athlete)
   avatarUrl          String?   @map("avatar_url") @db.VarChar(500)
   shortDescription   String?   @map("short_description")
   phone              String?   @db.VarChar(50)
   domainsOfExpertise String[]  @default([]) @map("domains_of_expertise")
   reputationScore    Int       @default(0) @map("reputation_score")
+  stripeConnectAccountId  String?  @map("stripe_connect_account_id") @db.VarChar(255)
+  stripeConnectOnboarded  Boolean  @default(false) @map("stripe_connect_onboarded")
   lastLoginAt        DateTime? @map("last_login_at") @db.Timestamptz
   createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz
   deletedAt          DateTime? @map("deleted_at") @db.Timestamptz
 
   memberships        OrganizationMember[]
+  clientProfile      Client?
 
   createdExercises   Exercise[]
   createdSessions    Session[]
@@ -182,6 +187,9 @@ model User {
   contentReports     ContentReport[]      @relation("Reporter")
   reviewedReports    ContentReport[]      @relation("Reviewer")
   invitationsSent    OrganizationInvitation[]
+
+  purchases          MarketplacePurchase[] @relation("PurchasesBuyer")
+  sales              MarketplacePurchase[] @relation("PurchasesSeller")
 
   @@index([externalUserId])
   @@map("users")
@@ -753,10 +761,12 @@ model Client {
   avatarUrl      String?   @map("avatar_url") @db.VarChar(500)
   organizationId String?   @map("organization_id")
   digitalTwinId  String?   @map("digital_twin_id") @db.VarChar(255)
+  userId         String?   @unique @map("user_id")
   createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
   organization        Organization?            @relation(fields: [organizationId], references: [id])
+  user                User?                    @relation(fields: [userId], references: [id])
   programAssignments  ClientProgramAssignment[]
 
   @@index([organizationId])
@@ -926,8 +936,12 @@ model MarketplacePurchase {
   platformFee           Decimal  @map("platform_fee") @db.Decimal(10, 2)
   sellerRevenue         Decimal  @map("seller_revenue") @db.Decimal(10, 2)
   stripePaymentIntentId String?  @map("stripe_payment_intent_id") @db.VarChar(255)
+  stripeTransferId      String?  @map("stripe_transfer_id") @db.VarChar(255)
   status                String   @db.VarChar(50)
   createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  buyer   User @relation("PurchasesBuyer", fields: [buyerId], references: [id])
+  seller  User @relation("PurchasesSeller", fields: [sellerId], references: [id])
 
   @@map("marketplace_purchases")
 }
