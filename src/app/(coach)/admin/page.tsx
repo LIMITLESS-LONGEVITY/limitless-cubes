@@ -11,6 +11,7 @@ import {
   CalendarDays,
   LayoutGrid,
   CreditCard,
+  BarChart3,
   Crown,
   Shield,
   ArrowRight,
@@ -144,6 +145,12 @@ export default function AdminPage() {
       label: 'Settings',
       description: 'Organization name, branding, and defaults',
       icon: Settings,
+    },
+    {
+      href: '/admin/analytics',
+      label: 'Analytics',
+      description: 'Content performance, client engagement, and revenue',
+      icon: BarChart3,
     },
   ]
 
