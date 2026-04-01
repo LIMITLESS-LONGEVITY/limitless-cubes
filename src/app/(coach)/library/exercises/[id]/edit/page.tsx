@@ -1,13 +1,25 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation } from '@tanstack/react-query'
-import { useRouter } from 'next/navigation'
-import { ArrowLeft, Loader2, Film, Image as ImageIcon, Plus } from 'lucide-react'
-import { exerciseApi, taxonomyApi } from '@/hooks/use-api'
+import { useRouter, useParams } from 'next/navigation'
+import { ArrowLeft, Loader2, Plus, Trash2, Film, Image as ImageIcon } from 'lucide-react'
+import { exerciseApi, taxonomyApi, type Exercise } from '@/hooks/use-api'
 
-export default function NewExercisePage() {
+const BASE_URL = process.env.NEXT_PUBLIC_BASE_PATH || ''
+
+interface MediaItem {
+  id: string
+  mediaType: string
+  url: string
+  title: string | null
+  position: number
+}
+
+export default function EditExercisePage() {
   const router = useRouter()
+  const params = useParams()
+  const id = params.id as string
 
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
@@ -18,9 +30,18 @@ export default function NewExercisePage() {
   const [creatorNotes, setCreatorNotes] = useState('')
   const [visibility, setVisibility] = useState('private')
   const [error, setError] = useState('')
-  const [pendingMedia, setPendingMedia] = useState<Array<{ type: 'youtube' | 'image'; url: string }>>([])
+
+  // Media state
+  const [media, setMedia] = useState<MediaItem[]>([])
   const [youtubeUrl, setYoutubeUrl] = useState('')
   const [imageUrl, setImageUrl] = useState('')
+  const [addingMedia, setAddingMedia] = useState(false)
+
+  const { data: exercise, isLoading: exerciseLoading, error: fetchError } = useQuery({
+    queryKey: ['exercise', id],
+    queryFn: () => exerciseApi.get(id),
+    enabled: !!id,
+  })
 
   const { data: domains } = useQuery({
     queryKey: ['domains'],
@@ -32,26 +53,26 @@ export default function NewExercisePage() {
     queryFn: taxonomyApi.difficultyLevels,
   })
 
-  const BASE_URL = process.env.NEXT_PUBLIC_BASE_PATH || ''
+  // Populate form when exercise data loads
+  useEffect(() => {
+    if (exercise) {
+      setName(exercise.name)
+      setDescription(exercise.description || '')
+      const totalSec = exercise.durationSeconds || 0
+      setDurationMinutes(Math.floor(totalSec / 60))
+      setDurationSeconds(totalSec % 60)
+      setDifficultyLevelId(exercise.difficultyLevel?.id || '')
+      setSelectedDomains(exercise.domains.map((d) => d.domain.id))
+      setCreatorNotes(exercise.creatorNotes || '')
+      setVisibility(exercise.visibility)
+      setMedia(exercise.media || [])
+    }
+  }, [exercise])
 
-  const createMutation = useMutation({
-    mutationFn: (data: Record<string, unknown>) => exerciseApi.create(data),
-    onSuccess: async (created) => {
-      // Add any pending media
-      for (let i = 0; i < pendingMedia.length; i++) {
-        const m = pendingMedia[i]
-        try {
-          await fetch(`${BASE_URL}/api/v1/exercises/${created.id}/media`, {
-            method: 'POST',
-            credentials: 'include',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ type: m.type, url: m.url, position: i }),
-          })
-        } catch {
-          // Non-blocking — media can be added later via edit
-        }
-      }
-      router.push(`/library/exercises/${created.id}`)
+  const updateMutation = useMutation({
+    mutationFn: (data: Record<string, unknown>) => exerciseApi.update(id, data),
+    onSuccess: () => {
+      router.push(`/library/exercises/${id}`)
     },
     onError: (err: Error) => {
       setError(err.message)
@@ -69,7 +90,7 @@ export default function NewExercisePage() {
 
     const totalSeconds = durationMinutes * 60 + durationSeconds
 
-    createMutation.mutate({
+    updateMutation.mutate({
       name: name.trim(),
       description: description.trim() || null,
       durationSeconds: totalSeconds,
@@ -80,9 +101,69 @@ export default function NewExercisePage() {
     })
   }
 
-  function toggleDomain(id: string) {
+  function toggleDomain(domainId: string) {
     setSelectedDomains((prev) =>
-      prev.includes(id) ? prev.filter((d) => d !== id) : [...prev, id]
+      prev.includes(domainId) ? prev.filter((d) => d !== domainId) : [...prev, domainId]
+    )
+  }
+
+  async function handleAddMedia(type: 'youtube' | 'image', url: string) {
+    if (!url.trim()) return
+    setAddingMedia(true)
+    try {
+      const res = await fetch(`${BASE_URL}/api/v1/exercises/${id}/media`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type, url: url.trim(), position: media.length }),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ error: res.statusText }))
+        throw new Error(body.error || `Failed to add media`)
+      }
+      const created = await res.json()
+      setMedia((prev) => [...prev, created])
+      if (type === 'youtube') setYoutubeUrl('')
+      if (type === 'image') setImageUrl('')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to add media')
+    } finally {
+      setAddingMedia(false)
+    }
+  }
+
+  async function handleDeleteMedia(mediaId: string) {
+    try {
+      const res = await fetch(`${BASE_URL}/api/v1/exercises/${id}/media/${mediaId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ error: res.statusText }))
+        throw new Error(body.error || 'Failed to delete media')
+      }
+      setMedia((prev) => prev.filter((m) => m.id !== mediaId))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete media')
+    }
+  }
+
+  if (exerciseLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--surface-app)' }}>
+        <Loader2 size={32} className="animate-spin text-neutral-600" />
+      </div>
+    )
+  }
+
+  if (fetchError || !exercise) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4" style={{ background: 'var(--surface-app)' }}>
+        <p className="text-sm text-neutral-400">Exercise not found</p>
+        <button onClick={() => router.back()} className="text-sm text-neutral-500 hover:text-neutral-300 transition-colors">
+          Go back
+        </button>
+      </div>
     )
   }
 
@@ -110,7 +191,7 @@ export default function NewExercisePage() {
           Back
         </button>
 
-        <h1 className="text-2xl font-semibold text-neutral-100 mb-8">Create Exercise</h1>
+        <h1 className="text-2xl font-semibold text-neutral-100 mb-8">Edit Exercise</h1>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-6">
           {/* Name */}
@@ -252,27 +333,28 @@ export default function NewExercisePage() {
           <div className="flex flex-col gap-3">
             <label className="text-sm font-medium text-neutral-300">Media</label>
 
-            {/* Pending media list */}
-            {pendingMedia.length > 0 && (
+            {/* Existing media */}
+            {media.length > 0 && (
               <div className="flex flex-col gap-2">
-                {pendingMedia.map((m, i) => (
+                {media.map((m) => (
                   <div
-                    key={i}
+                    key={m.id}
                     className="flex items-center gap-3 p-3 rounded-lg"
-                    style={{ background: 'var(--surface-card, #1a1a1a)', border: '1px solid #222' }}
+                    style={{ background: 'var(--surface-card)', border: '1px solid #222' }}
                   >
-                    {m.type === 'youtube' ? (
+                    {m.mediaType === 'youtube' ? (
                       <Film size={16} className="text-red-400 flex-shrink-0" />
                     ) : (
                       <ImageIcon size={16} className="text-blue-400 flex-shrink-0" />
                     )}
                     <span className="text-sm text-neutral-300 truncate flex-1">{m.url}</span>
+                    <span className="text-[10px] text-neutral-500 uppercase flex-shrink-0">{m.mediaType}</span>
                     <button
                       type="button"
-                      onClick={() => setPendingMedia((prev) => prev.filter((_, idx) => idx !== i))}
-                      className="text-xs text-neutral-500 hover:text-red-400 transition-colors"
+                      onClick={() => handleDeleteMedia(m.id)}
+                      className="p-1 text-neutral-500 hover:text-red-400 transition-colors flex-shrink-0"
                     >
-                      Remove
+                      <Trash2 size={14} />
                     </button>
                   </div>
                 ))}
@@ -293,15 +375,12 @@ export default function NewExercisePage() {
               />
               <button
                 type="button"
-                disabled={!youtubeUrl.trim()}
-                onClick={() => {
-                  setPendingMedia((prev) => [...prev, { type: 'youtube', url: youtubeUrl.trim() }])
-                  setYoutubeUrl('')
-                }}
+                disabled={!youtubeUrl.trim() || addingMedia}
+                onClick={() => handleAddMedia('youtube', youtubeUrl)}
                 className="flex items-center gap-1 px-3 py-2 text-xs font-medium text-white rounded-md transition-colors disabled:opacity-50"
                 style={{ background: 'var(--accent)' }}
               >
-                <Plus size={12} />
+                {addingMedia ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
                 Add
               </button>
             </div>
@@ -320,15 +399,12 @@ export default function NewExercisePage() {
               />
               <button
                 type="button"
-                disabled={!imageUrl.trim()}
-                onClick={() => {
-                  setPendingMedia((prev) => [...prev, { type: 'image', url: imageUrl.trim() }])
-                  setImageUrl('')
-                }}
+                disabled={!imageUrl.trim() || addingMedia}
+                onClick={() => handleAddMedia('image', imageUrl)}
                 className="flex items-center gap-1 px-3 py-2 text-xs font-medium text-white rounded-md transition-colors disabled:opacity-50"
                 style={{ background: 'var(--accent)' }}
               >
-                <Plus size={12} />
+                {addingMedia ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
                 Add
               </button>
             </div>
@@ -344,14 +420,14 @@ export default function NewExercisePage() {
           {/* Submit */}
           <button
             type="submit"
-            disabled={createMutation.isPending || !name.trim()}
+            disabled={updateMutation.isPending || !name.trim()}
             className="flex items-center justify-center gap-2 px-6 py-3 text-sm font-medium text-white rounded-lg transition-colors disabled:opacity-50"
             style={{ background: 'var(--accent)' }}
-            onMouseEnter={(e) => !createMutation.isPending && (e.currentTarget.style.background = 'var(--accent-hover)')}
+            onMouseEnter={(e) => !updateMutation.isPending && (e.currentTarget.style.background = 'var(--accent-hover)')}
             onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--accent)')}
           >
-            {createMutation.isPending && <Loader2 size={16} className="animate-spin" />}
-            Create Exercise
+            {updateMutation.isPending && <Loader2 size={16} className="animate-spin" />}
+            Save Changes
           </button>
         </form>
       </div>
