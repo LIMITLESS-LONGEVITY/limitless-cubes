@@ -19,6 +19,7 @@ interface AuthUser {
 const NAV_LINKS = [
   { href: '/builder', label: 'Builder' },
   { href: '/library/exercises', label: 'Library' },
+  { href: '/marketplace', label: 'Marketplace' },
   { href: '/clients', label: 'Clients' },
   { href: '/admin', label: 'Admin' },
 ]
