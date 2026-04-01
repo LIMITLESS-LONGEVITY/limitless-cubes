@@ -89,7 +89,7 @@ export function LibraryPanel({ mode, collapsed, onToggle }: LibraryPanelProps) {
 function ExerciseList({ search }: { search: string }) {
   const { data, isLoading } = useQuery({
     queryKey: ['exercises', search],
-    queryFn: () => exerciseApi.list({ search, status: 'published', limit: '50' }),
+    queryFn: () => exerciseApi.list({ search, limit: '50' }),
   })
 
   if (isLoading) return <LoadingSkeleton />
